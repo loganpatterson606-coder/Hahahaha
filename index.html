@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VR Attestation Gateway</title>
+<style>
+:root{color-scheme:dark;--bg:#090d18;--panel:#121a2c;--line:#26334d;--muted:#a8b4ca;--accent:#8ca0ff;--cyan:#63d9e8;--green:#79e0a6;--red:#ff8b9a}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 15% 0%,#1b2c4c 0,transparent 45%),var(--bg);color:#f3f6ff;font:15px/1.55 Inter,system-ui,sans-serif}
+header{padding:20px max(22px,calc((100% - 1080px)/2));border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:#0b1120cc}.brand{font-weight:900;letter-spacing:2px}.online{color:var(--green);font-size:11px;letter-spacing:1.4px}
+main{max-width:1080px;margin:38px auto;padding:0 20px 60px}.hero{margin-bottom:26px}.hero h1{font-size:clamp(32px,6vw,56px);line-height:1.05;letter-spacing:-2px;margin:0 0 12px}.hero h1 span{color:var(--cyan)}.hero p{color:var(--muted);max-width:800px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.panel{background:#121a2ceF;border:1px solid var(--line);border-radius:16px;padding:22px;min-width:0}.full{grid-column:1/-1}h2{font-size:13px;letter-spacing:1.5px;text-transform:uppercase;margin:0 0 15px;color:#dbe3ff}
+label{display:block;color:var(--muted);font-size:12px;margin:13px 0 6px}input,select,textarea{width:100%;background:#080e1b;color:#f5f7ff;border:1px solid #34415d;border-radius:9px;padding:12px;font:inherit}textarea{min-height:150px;resize:vertical;font-family:ui-monospace,monospace;font-size:12px;overflow-wrap:anywhere}
+button{background:#27375c;color:white;border:1px solid #4b6192;border-radius:9px;padding:11px 15px;font-weight:750;cursor:pointer}button:hover{background:#354b7b}.primary{background:linear-gradient(100deg,#596fe0,#27899a);border:0;width:100%;margin-top:17px;padding:14px}.row{display:flex;gap:10px;flex-wrap:wrap}.row button{flex:1}.note,.status{border-radius:9px;background:#0b1323;border:1px solid #273752;padding:12px;color:var(--muted);font-size:12px;margin-top:12px;overflow-wrap:anywhere}.status.good{color:var(--green)}.status.bad{color:var(--red)}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#080e1b;border:1px solid #26334d;padding:16px;border-radius:10px;min-height:130px;max-height:450px;overflow:auto;color:#b8f3d0;font-size:12px}.footer{text-align:center;color:#8996ad;font-size:11px;padding:30px;line-height:1.8}
+@media(max-width:720px){.grid{grid-template-columns:1fr}.full{grid-column:auto}header{padding:18px 20px}}
+</style>
+</head>
+<body>
+<header><div class="brand">VR // ATTESTATION GATEWAY</div><div class="online">PROVIDER VERIFICATION</div></header>
+<main>
+<section class="hero"><h1>Real provider <span>verification.</span></h1><p>Engine-agnostic backend for VR applications. Meta Quest attestations are checked by Meta; Google Play Integrity tokens are decoded by Google. This console does not mint, forge, or locally sign attestation tokens.</p></section>
+<div class="grid">
+<section class="panel">
+<h2>01 / Provider and challenge</h2>
+<label for="provider">Attestation provider</label>
+<select id="provider"><option value="meta_quest">Meta Quest — Horizon OS</option><option value="google_play_integrity">Google Play Integrity — supported Android VR</option></select>
+<label for="action">Protected action</label><input id="action" value="session_start" maxlength="100">
+<button class="primary" id="challengeBtn" onclick="createChallenge()">CREATE ONE-TIME CHALLENGE</button>
+<div id="challengeStatus" class="status">No challenge issued.</div>
+<div class="note">Meta Quest uses the nonce with DeviceApplicationIntegrity.GetIntegrityToken(). Google Play Integrity Standard requests use the returned request_hash. The challenge is single-use.</div>
+</section>
+<section class="panel">
+<h2>02 / Submit provider token</h2>
+<label for="packageName">Android package name (Google only)</label><input id="packageName" placeholder="com.studio.vrgame">
+<label for="providerToken">Provider-issued token</label><textarea id="providerToken" placeholder="Paste the raw token returned by Meta or Google on the VR device"></textarea>
+<button class="primary" id="verifyBtn" onclick="verifyToken()">VERIFY WITH PROVIDER</button>
+<div id="resultStatus" class="status">Waiting for a provider token.</div>
+</section>
+<section class="panel full">
+<h2>03 / Verification result</h2><pre id="output">No verification performed.</pre>
+<div class="row"><button onclick="copyOutput()">COPY RESULT</button><button onclick="clearOutput()">CLEAR</button></div>
+</section>
+<section class="panel full">
+<h2>04 / Supported VR deployment model</h2>
+<div class="note"><b>Meta Quest standalone:</b> Use Meta Horizon Platform SDK Device &amp; Application Integrity. Meta currently documents Quest 2, Quest Pro, Quest 3 and Quest 3S support for this Android-platform API.</div>
+<div class="note"><b>Android VR distributed through Google Play:</b> Use Google Play Integrity Standard API. The client supplies the request hash and sends the returned token to this backend.</div>
+<div class="note"><b>PCVR / SteamVR / other OpenXR runtimes:</b> Use the platform's own authentication or anti-cheat solution. OpenXR itself does not issue a universal hardware-attestation token. Do not label these sessions Meta- or Google-verified.</div>
+</section>
+</div>
+</main>
+<div class="footer">VR ATTESTATION GATEWAY · NO LOCAL TOKEN ISSUANCE · PROVIDER SECRETS REMAIN SERVER-SIDE<br>Use HTTPS in production. Protect verification routes with your game's normal authenticated session and rate limits.</div>
+<script>
+let challenge=null;
+async function postJson(url,body){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();if(!r.ok||j.success===false)throw new Error(j.error||`HTTP ${r.status}`);return j;}
+async function createChallenge(){const btn=document.getElementById('challengeBtn');btn.disabled=true;try{challenge=await postJson('/api/challenge',{provider:document.getElementById('provider').value,action:document.getElementById('action').value.trim()||'session_start'});document.getElementById('challengeStatus').textContent=JSON.stringify(challenge,null,2);document.getElementById('challengeStatus').className='status good';document.getElementById('resultStatus').textContent='Challenge ready. Obtain a provider token in the VR client.';}catch(e){challenge=null;document.getElementById('challengeStatus').textContent=e.message;document.getElementById('challengeStatus').className='status bad';}finally{btn.disabled=false;}}
+async function verifyToken(){const btn=document.getElementById('verifyBtn');const token=document.getElementById('providerToken').value.trim();if(!challenge){setStatus('Create a challenge first.',false);return;}if(!token){setStatus('Paste the raw provider token first.',false);return;}btn.disabled=true;try{let result;if(challenge.provider==='meta_quest'){result=await postJson('/api/verify/meta',{nonce:challenge.nonce,attestation_token:token});}else{result=await postJson('/api/verify/google',{nonce:challenge.nonce,integrity_token:token,package_name:document.getElementById('packageName').value.trim()});}document.getElementById('output').textContent=JSON.stringify(result,null,2);setStatus('Provider verification passed. This result is provider-verified.',true);challenge=null;}catch(e){document.getElementById('output').textContent=JSON.stringify({provider_verified:false,error:e.message},null,2);setStatus(e.message,false);challenge=null;}finally{btn.disabled=false;}}
+function setStatus(s,good){const el=document.getElementById('resultStatus');el.textContent=s;el.className='status '+(good?'good':'bad');}
+function copyOutput(){navigator.clipboard?.writeText(document.getElementById('output').textContent);}
+function clearOutput(){document.getElementById('output').textContent='No verification performed.';document.getElementById('providerToken').value='';challenge=null;document.getElementById('challengeStatus').textContent='No challenge issued.';setStatus('Cleared.',true);}
+</script>
+</body></html>
