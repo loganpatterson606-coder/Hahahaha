@@ -8,7 +8,7 @@ function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":
 async function api(url, options={}){const response=await fetch(url,{headers:{"Content-Type":"application/json",...(options.headers||{})},...options});let data={};try{data=await response.json()}catch{}if(!response.ok)throw new Error(data.error||`Request failed (${response.status})`);return data}
 function showView(name){state.view=name;document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id===`view-${name}`));document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.target===name));$("crumbCurrent").textContent=navNames[name];if(name==="adb")refreshDevices();if(name==="diagnostics")runDiagnostics()}
 document.querySelectorAll("[data-target]").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.target)));
-$("refreshAll").addEventListener("click",()=>{refreshHealth();if(state.view==="adb")refreshDevices();toast("Workspace refreshed")});
+$("refreshAll").addEventListener("click",()=>{loadStudios();refreshHealth();if(state.view==="adb")refreshDevices();toast("Workspace refreshed")});
 async function refreshHealth(){
  try{
   const h=await api("/api/health");$("systemStatus").textContent="BACKEND ONLINE";$("sideConnection").textContent="Backend online";$("sideSub").textContent="Render service responding";$("sideDot").classList.add("online");
@@ -37,11 +37,26 @@ async function selectDevice(serial){state.selectedDevice=serial;document.querySe
 $("refreshDevices").addEventListener("click",refreshDevices);
 $("disconnectDevice").addEventListener("click",async()=>{const endpoint=$("connectEndpoint").value.trim();if(!endpoint){toast("Enter the device IP:port in the connect field to disconnect",true);return}try{const d=await getAgent("/api/disconnect","POST",{endpoint});log(d.output);toast("Device disconnected");state.selectedDevice=null;$("deviceInfo").classList.add("hidden");await refreshDevices()}catch(e){toast(e.message,true)}});
 $("clearTerminal").addEventListener("click",()=>$("terminal").innerHTML="");
+async function loadStudios(){
+ const select=$("studioId");
+ try{
+  const d=await api("/api/studios");
+  select.innerHTML="";
+  if(!d.studios?.length){select.innerHTML='<option value="">No studios configured</option>';$("metaStatus").innerHTML="<i></i> SETUP REQUIRED";return}
+  select.innerHTML='<option value="">Select a registered studio…</option>'+d.studios.map(s=>`<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`).join("");
+  $("metaStatus").innerHTML="<i></i> "+d.studios.length+" STUDIO PROFILE(S)";
+ }catch(e){select.innerHTML='<option value="">Could not load studios</option>';toast(e.message,true)}
+}
 async function createChallenge(){
- const package_id=$("packageId").value.trim(),session_ref=$("sessionRef").value.trim();
- if(!package_id){toast("Enter your app's package ID",true);return}
- try{const d=await api("/api/challenge",{method:"POST",body:JSON.stringify({package_id,session_ref})});state.challenge=d;$("challengeCard").classList.remove("hidden");$("nonceValue").textContent=d.challenge_nonce;$("challengeMeta").textContent=`Package ${d.package_id} · ${d.nonce_length} characters · expires in ${d.expires_in}s`;$("challengeTimer").textContent=`${d.expires_in}S TTL`;toast("Fresh one-time challenge generated")}
- catch(e){toast(e.message,true)}
+ const studio_id=$("studioId").value,device_serial=$("deviceSerial").value.trim(),session_ref=$("sessionRef").value.trim();
+ if(!studio_id){toast("Select a registered studio first",true);return}
+ if(!device_serial){toast("Enter the Quest serial number",true);return}
+ try{
+  const d=await api("/api/challenge",{method:"POST",body:JSON.stringify({studio_id,device_serial,session_ref})});
+  state.challenge=d;$("challengeCard").classList.remove("hidden");$("nonceValue").textContent=d.challenge_nonce;
+  $("challengeMeta").textContent=`${d.studio_name} · ${d.device_serial} · ${d.package_id} · ${d.nonce_length} characters`;
+  $("challengeTimer").textContent=`${d.expires_in}S TTL`;toast("Studio and device accepted. Fresh one-time challenge generated");
+ }catch(e){toast(e.message,true)}
 }
 $("createChallenge").addEventListener("click",createChallenge);
 $("copyNonce").addEventListener("click",()=>copyText(state.challenge?.challenge_nonce||""));
@@ -53,7 +68,7 @@ $("verifyMeta").addEventListener("click",async()=>{
  const btn=$("verifyMeta");btn.disabled=true;btn.textContent="CONTACTING META…";
  try{
   const d=await api("/api/verify/meta",{method:"POST",body:JSON.stringify({challenge_id:state.challenge.challenge_id,challenge_nonce:state.challenge.challenge_nonce,attestation_token:token})});
-  $("verifyResult").className="verify-result "+(d.ok?"good":"bad");$("verifyResult").textContent=d.ok?"Meta verified the token and all configured policy checks passed.":`Meta verified the signature, but local policy checks failed: ${(d.policy_issues||[]).join(", ")}`;
+  $("verifyResult").className="verify-result "+(d.ok?"good":"bad");$("verifyResult").textContent=d.ok?`Meta verified the token and all configured policy checks passed for ${d.studio_name} / ${d.device_serial}.`:`Meta verified the signature, but local policy checks failed: ${(d.policy_issues||[]).join(", ")}`;
   $("claimsOutput").textContent=JSON.stringify(d,null,2);state.challenge=null;toast(d.ok?"Meta attestation verified":"Provider verified; policy rejected",!d.ok)
  }catch(e){$("verifyResult").className="verify-result bad";$("verifyResult").textContent=e.message;$("claimsOutput").textContent=JSON.stringify({error:e.message},null,2);toast(e.message,true)}
  finally{btn.disabled=false;btn.innerHTML='VERIFY TOKEN WITH META <b>↗</b>'}
