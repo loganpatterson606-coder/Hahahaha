@@ -82,7 +82,9 @@
       <div class="attest-layout">
         <section class="surface">
           <div class="surface-head"><div><span class="overline">01 / CHALLENGE</span><h3>Generate server nonce</h3></div><span class="status-pill"><i></i> SINGLE USE</span></div>
-          <label for="packageId">Application package ID</label><input id="packageId" placeholder="com.example.questapp">
+          <label for="studioId">Verified studio</label><select id="studioId"><option value="">Loading registered studios…</option></select>
+          <label for="deviceSerial">Quest device serial number</label><input id="deviceSerial" placeholder="Enter a serial registered to this studio" autocomplete="off" spellcheck="false">
+          <p class="field-help">The serial must already be on this studio’s server-side allow-list. A serial associates the device with a studio; genuine Meta attestation is still required to prove platform integrity.</p>
           <label for="sessionRef">Session reference <small>(optional)</small></label><input id="sessionRef" value="studio-session">
           <button class="button primary wide" id="createChallenge">GENERATE CHALLENGE <b>↗</b></button>
           <div class="challenge-card hidden" id="challengeCard"><div class="challenge-head"><span>CHALLENGE READY</span><span id="challengeTimer">EXPIRES SOON</span></div><small>CHALLENGE NONCE · BASE64URL</small><code id="nonceValue"></code><div class="challenge-actions"><button class="button tiny" id="copyNonce">COPY NONCE</button><button class="button tiny" id="copyChallenge">COPY REQUEST JSON</button></div><p id="challengeMeta"></p></div>
