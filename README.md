@@ -69,8 +69,8 @@ In the dashboard's ADB Console, enter the PC's reachable address and the same to
 On Quest, enable Developer Mode and Wireless Debugging. Use the pairing IP:port and six-digit pairing code shown by Quest's **Pair new device** screen. After pairing, connect using the regular Wireless Debugging IP:port.
 
 Security notes:
-- The companion only permits `adb devices -l`, `adb pair`, `adb connect`, `adb disconnect`, `getprop` for a fixed set of system properties, `get-state`, and `dumpsys battery`.
-- It does not run arbitrary shell commands, root the device, extract app-private data, or retrieve third-party app tokens.
+- The companion permits `adb devices -l`, `adb pair`, `adb connect`, `adb disconnect`, a fixed set of `getprop` reads, `get-state`, `dumpsys battery`, and two fixed root-diagnostic endpoints. Root detection runs only `su -c id`; optional root diagnostics read build tags, SELinux mode and build type.
+- Root mode never roots or modifies the device. It only detects root that already exists and, if selected, runs a small allow-listed set of read-only checks. It does not access app-private data, inspect game memory, retrieve third-party app tokens, bypass integrity controls, or treat root as Meta attestation.
 - Restrict the companion to a trusted LAN. Set `ADB_ALLOWED_ORIGIN` to your dashboard origin when browser access is cross-origin. Do not expose port 8765 directly to the public internet. If remote access is needed, use a private authenticated tunnel.
 - The dashboard browser must be able to reach the companion URL. HTTPS pages may block plain-HTTP LAN endpoints depending on browser/platform security policy; use a trusted HTTPS tunnel if needed.
 
