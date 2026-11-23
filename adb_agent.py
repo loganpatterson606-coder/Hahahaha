@@ -165,6 +165,49 @@ def device_info():
     return jsonify({"ok": True, "device": result})
 
 
+@app.post("/api/root-status")
+def root_status():
+    """Detect existing root access using one fixed, read-only command."""
+    data = request.get_json(silent=True) or {}
+    serial = str(data.get("serial", "")).strip()
+    if not serial or len(serial) > 200 or any(ch.isspace() for ch in serial):
+        return jsonify({"ok": False, "error": "Select a connected device first."}), 400
+    state, err = run_adb(["-s", serial, "get-state"])
+    if err or state != "device":
+        return jsonify({"ok": False, "error": err or "Device is not connected."}), 409
+    output, root_err = run_adb(["-s", serial, "shell", "su", "-c", "id"], timeout=8)
+    rooted = bool(not root_err and output and re.search(r"\buid=0\(root\)", output))
+    return jsonify({"ok": True, "rooted": rooted, "serial": serial,
+                    "evidence": output if rooted else (root_err or output or "su did not return root identity"),
+                    "note": "Read-only root capability check. Device-reported output is not a Meta attestation verdict."})
+
+
+@app.post("/api/root-diagnostics")
+def root_diagnostics():
+    """Return a small fixed set of read-only diagnostics through existing root."""
+    data = request.get_json(silent=True) or {}
+    serial = str(data.get("serial", "")).strip()
+    if not serial or len(serial) > 200 or any(ch.isspace() for ch in serial):
+        return jsonify({"ok": False, "error": "Select a connected device first."}), 400
+    state, err = run_adb(["-s", serial, "get-state"])
+    if err or state != "device":
+        return jsonify({"ok": False, "error": err or "Device is not connected."}), 409
+    identity, identity_err = run_adb(["-s", serial, "shell", "su", "-c", "id"], timeout=8)
+    if identity_err or not identity or not re.search(r"\buid=0\(root\)", identity):
+        return jsonify({"ok": False, "error": "Root access was not confirmed. Choose ADB only."}), 403
+    checks = {
+        "build_tags": ["-s", serial, "shell", "su", "-c", "getprop ro.build.tags"],
+        "selinux": ["-s", serial, "shell", "su", "-c", "getenforce"],
+        "build_type": ["-s", serial, "shell", "su", "-c", "getprop ro.build.type"],
+    }
+    results = {"root_identity": identity}
+    for key, command in checks.items():
+        value, check_err = run_adb(command, timeout=8)
+        results[key] = value if not check_err else "Unavailable: " + check_err
+    return jsonify({"ok": True, "serial": serial, "diagnostics": results,
+                    "note": "Read-only device diagnostics only. These values are device-reported and are not proof of Meta integrity."})
+
+
 if __name__ == "__main__":
     # Keep the companion on the private LAN by default. Do not expose it publicly
     # without a secure tunnel, a strong random token, and an explicit origin allowlist.
