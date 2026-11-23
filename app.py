@@ -129,7 +129,7 @@ def load_studios() -> dict[str, dict[str, Any]]:
             serials = {str(value).strip() for value in serials_raw if str(value).strip()} if isinstance(serials_raw, list) else set()
             if (not re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", studio_id)
                     or not name or len(name) > 100
-                    or not re.fullmatch(r"[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+", package_id)
+                    or not re.fullmatch(r"[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)+", package_id)
                     or not access_token or not certs or not serials):
                 app.logger.warning("Skipping incomplete or invalid studio profile: %s", studio_id or "(no id)")
                 continue
