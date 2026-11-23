@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0e12">
+<title>Attestation Studio — Quest Systems Console</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="ambient ambient-a"></div><div class="ambient ambient-b"></div><div class="grain"></div>
+<div class="app-shell">
+  <aside class="sidebar">
+    <a class="brand" href="/"><span class="brand-mark"><i></i><i></i><i></i></span><span>ATTESTATION<span class="brand-light">STUDIO</span></span></a>
+    <div class="side-label">WORKSPACE</div>
+    <button class="nav-item active" data-target="overview"><span class="nav-icon">◫</span> Overview <kbd>01</kbd></button>
+    <button class="nav-item" data-target="adb"><span class="nav-icon">⌁</span> ADB Console <kbd>02</kbd></button>
+    <button class="nav-item" data-target="attestation"><span class="nav-icon">⛨</span> Meta Attestation <kbd>03</kbd></button>
+    <button class="nav-item" data-target="diagnostics"><span class="nav-icon">⌘</span> Diagnostics <kbd>04</kbd></button>
+    <div class="sidebar-bottom">
+      <div class="connection-card"><span class="connection-dot" id="sideDot"></span><div><b id="sideConnection">Checking services</b><small id="sideSub">Waiting for status</small></div></div>
+      <div class="side-foot">QUEST TOOLING <span>BUILD 2.4.0</span></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="crumb"><span>WORKSPACE</span><b>/</b><strong id="crumbCurrent">Overview</strong></div>
+      <div class="top-actions"><span class="system-status"><i></i><span id="systemStatus">SYSTEM CHECK</span></span><button class="icon-button" id="refreshAll" title="Refresh status">↻</button><div class="avatar">AS</div></div>
+    </header>
+
+    <section class="view active" id="view-overview">
+      <div class="page-heading">
+        <div><div class="overline">MONDAY / SYSTEMS OVERVIEW</div><h1>Your Quest <em>workspace.</em></h1><p>Device diagnostics, wireless ADB and genuine platform attestation in one place.</p></div>
+        <div class="heading-chip"><span class="pulse"></span> LIVE WORKSPACE</div>
+      </div>
+      <div class="metrics">
+        <article class="metric"><div class="metric-top"><span>ADB BRIDGE</span><span class="metric-symbol">⌁</span></div><strong id="metricAdb">—</strong><small id="metricAdbSub">Companion status</small><div class="metric-line"><i id="adbLine"></i></div></article>
+        <article class="metric"><div class="metric-top"><span>META PROVIDER</span><span class="metric-symbol">⛨</span></div><strong id="metricMeta">—</strong><small id="metricMetaSub">Server credentials</small><div class="metric-line"><i id="metaLine"></i></div></article>
+        <article class="metric"><div class="metric-top"><span>CHALLENGE ENGINE</span><span class="metric-symbol">⌘</span></div><strong>READY</strong><small>Single-use nonce service</small><div class="metric-line"><i class="line-live"></i></div></article>
+      </div>
+      <div class="section-title"><div><span class="overline">CONTROL DECK</span><h2>Choose a workspace</h2></div><span class="muted-note">TOOLS / 04 MODULES</span></div>
+      <div class="module-grid">
+        <button class="module-card module-adb" data-target="adb"><span class="module-index">01 / DEVICE</span><span class="module-art art-terminal"><b>›_</b><i></i><i></i><i></i></span><strong>ADB Console</strong><p>Pair your Quest over Wi-Fi, connect and inspect device information.</p><span class="module-link">OPEN CONSOLE <b>↗</b></span></button>
+        <button class="module-card module-meta" data-target="attestation"><span class="module-index">02 / TRUST</span><span class="module-art art-shield">⛨<i></i></span><strong>Meta Attestation</strong><p>Issue a nonce, submit a native token and verify it with Meta's server.</p><span class="module-link">OPEN ATTESTATION <b>↗</b></span></button>
+        <button class="module-card" data-target="diagnostics"><span class="module-index">03 / INSPECT</span><span class="module-art art-wave">⌁</span><strong>Diagnostics</strong><p>Review backend health, integration readiness and troubleshooting signals.</p><span class="module-link">OPEN DIAGNOSTICS <b>↗</b></span></button>
+      </div>
+      <div class="bottom-grid">
+        <section class="surface"><div class="surface-head"><div><span class="overline">QUICK START</span><h3>Bring a device online</h3></div><span class="step-count">3 STEPS</span></div><div class="steps"><div><b>01</b><span><strong>Enable developer mode</strong><small>Enable Developer Mode and Wireless Debugging on your Quest.</small></span></div><div><b>02</b><span><strong>Start the local ADB companion</strong><small>Run the companion on a computer with Android Platform Tools installed.</small></span></div><div><b>03</b><span><strong>Pair and inspect</strong><small>Use the ADB Console to pair, connect and read device diagnostics.</small></span></div></div></section>
+        <section class="surface note-surface"><span class="overline">ARCHITECTURE NOTE</span><h3>Cloud + local bridge</h3><p>Render hosts the dashboard and Meta verification backend. ADB must run on a computer that can reach your headset over the local network; the Render server cannot see your home LAN.</p><button class="text-button" data-target="diagnostics">READ CONNECTION NOTES <b>↗</b></button></section>
+      </div>
+    </section>
+
+    <section class="view" id="view-adb">
+      <div class="page-heading compact"><div><div class="overline">DEVICE MANAGEMENT / WIRELESS DEBUGGING</div><h1>ADB <em>Console.</em></h1><p>Pair and inspect a Quest through your trusted local computer bridge.</p></div><span class="tag" id="adbTag">BRIDGE CHECKING</span></div>
+      <div class="adb-layout">
+        <section class="surface">
+          <div class="surface-head"><div><span class="overline">01 / COMPANION LINK</span><h3>Local ADB bridge</h3></div><span class="status-pill" id="agentStatus"><i></i> CHECKING</span></div>
+          <label for="agentUrl">Companion address</label><div class="input-row"><input id="agentUrl" placeholder="http://192.168.1.20:8765" value="http://127.0.0.1:8765"><button class="button secondary" id="saveAgent">CONNECT</button></div><label for="agentToken">Companion access token</label><input id="agentToken" type="password" placeholder="Same ADB_AGENT_TOKEN configured on your PC" autocomplete="off">
+          <p class="field-help">The companion runs on your PC, not on Render. If using a phone browser, the companion must be reachable from that phone and browser security rules must permit the connection.</p>
+          <div class="bridge-banner"><span class="bridge-icon">⌁</span><div><b>ADB runs locally</b><small>Quest and PC must be on the same Wi-Fi network for wireless debugging.</small></div><span class="bridge-state" id="bridgeState">OFFLINE</span></div>
+          <div class="surface-head sub-head"><div><span class="overline">02 / WIRELESS PAIRING</span><h3>Pair a new device</h3></div></div>
+          <label for="pairEndpoint">Pairing IP address and port</label><input id="pairEndpoint" placeholder="192.168.1.45:37621" autocomplete="off">
+          <label for="pairCode">Six-digit pairing code</label><div class="input-row"><input id="pairCode" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code"><button class="button primary" id="pairDevice">PAIR DEVICE</button></div>
+          <p class="field-help">On Quest: Settings → System → Developer → Wireless Debugging → Pair new device. Use the pairing port and code shown there.</p>
+          <div class="surface-head sub-head"><div><span class="overline">03 / CONNECT</span><h3>Connect paired device</h3></div></div>
+          <label for="connectEndpoint">Wireless debugging IP address and port</label><div class="input-row"><input id="connectEndpoint" placeholder="192.168.1.45:5555"><button class="button primary" id="connectDevice">CONNECT</button></div>
+        </section>
+        <section class="surface device-surface">
+          <div class="surface-head"><div><span class="overline">CONNECTED HARDWARE</span><h3>Device inventory</h3></div><button class="button tiny" id="refreshDevices">↻ REFRESH</button></div>
+          <div class="device-empty" id="deviceEmpty"><div class="empty-orbit"><span>⌁</span></div><b>No device selected</b><p>Pair and connect a Quest to populate device information here.</p></div>
+          <div id="deviceList" class="device-list"></div>
+          <div id="deviceInfo" class="device-info hidden"></div>
+          <div class="device-actions"><button class="button secondary" id="disconnectDevice">DISCONNECT SELECTED</button></div>
+        </section>
+      </div>
+      <section class="surface terminal-surface"><div class="surface-head"><div><span class="overline">ADB ACTIVITY</span><h3>Bridge output</h3></div><button class="text-button" id="clearTerminal">CLEAR OUTPUT</button></div><div class="terminal" id="terminal"><div class="terminal-line"><span>STUDIO</span> ADB console initialised. Companion connection pending.</div></div></section>
+    </section>
+
+    <section class="view" id="view-attestation">
+      <div class="page-heading compact"><div><div class="overline">PLATFORM INTEGRITY / SERVER VERIFICATION</div><h1>Meta <em>Attestation.</em></h1><p>Real provider verification. No locally forged tokens, mock signatures or simulated Meta verdicts.</p></div><span class="tag tag-violet">META PLATFORM API</span></div>
+      <div class="attest-layout">
+        <section class="surface">
+          <div class="surface-head"><div><span class="overline">01 / CHALLENGE</span><h3>Generate server nonce</h3></div><span class="status-pill"><i></i> SINGLE USE</span></div>
+          <label for="packageId">Application package ID</label><input id="packageId" placeholder="com.example.questapp">
+          <label for="sessionRef">Session reference <small>(optional)</small></label><input id="sessionRef" value="studio-session">
+          <button class="button primary wide" id="createChallenge">GENERATE CHALLENGE <b>↗</b></button>
+          <div class="challenge-card hidden" id="challengeCard"><div class="challenge-head"><span>CHALLENGE READY</span><span id="challengeTimer">EXPIRES SOON</span></div><small>CHALLENGE NONCE · BASE64URL</small><code id="nonceValue"></code><div class="challenge-actions"><button class="button tiny" id="copyNonce">COPY NONCE</button><button class="button tiny" id="copyChallenge">COPY REQUEST JSON</button></div><p id="challengeMeta"></p></div>
+          <div class="callout"><b>Native Quest app required</b><p>Pass this nonce to Meta's DeviceApplicationIntegrity API in your own Android/Quest app. The browser cannot request a genuine hardware-backed Meta token itself.</p></div>
+        </section>
+        <section class="surface">
+          <div class="surface-head"><div><span class="overline">02 / PROVIDER TOKEN</span><h3>Verify with Meta</h3></div><span class="status-pill" id="metaStatus"><i></i> SERVER CONFIG</span></div>
+          <label for="attestationToken">Meta-issued attestation token</label><textarea id="attestationToken" rows="7" placeholder="Paste the token returned by your authorised Quest app. Do not paste your App Secret here."></textarea>
+          <button class="button primary wide" id="verifyMeta">VERIFY TOKEN WITH META <b>↗</b></button>
+          <p class="field-help">Your App Access Token is held in Render Environment Variables and never sent to this page. The challenge is consumed after a provider response is received.</p>
+          <div id="verifyResult" class="verify-result hidden"></div>
+        </section>
+      </div>
+      <section class="surface claims-surface"><div class="surface-head"><div><span class="overline">03 / VERIFIED CLAIMS</span><h3>Provider response</h3></div><button class="text-button" id="copyClaims">COPY RESPONSE</button></div><pre id="claimsOutput">No provider response yet.</pre></section>
+    </section>
+
+    <section class="view" id="view-diagnostics">
+      <div class="page-heading compact"><div><div class="overline">SYSTEM HEALTH / INTEGRATION NOTES</div><h1>System <em>Diagnostics.</em></h1><p>Know which parts are online, configured and available to your current deployment.</p></div><button class="button secondary" id="runDiagnostics">RUN CHECKS ↻</button></div>
+      <section class="surface"><div class="surface-head"><div><span class="overline">LIVE SERVICE CHECKS</span><h3>Backend readiness</h3></div><span class="muted-note" id="diagUpdated">NOT CHECKED</span></div><div id="diagnosticRows" class="diagnostic-rows"><div class="diag-row"><span class="diag-icon">◌</span><div><b>Waiting for health check</b><small>Run diagnostics to inspect service configuration.</small></div><span class="diag-state">PENDING</span></div></div></section>
+      <div class="bottom-grid diag-notes">
+        <section class="surface"><span class="overline">META FLOW</span><h3>How genuine attestation works</h3><ol class="doc-list"><li>Backend generates a unique Base64URL nonce (22–172 chars).</li><li>Your native Quest app calls <code>getIntegrityToken(challengeNonce)</code>.</li><li>Meta signs the token; your app sends it to your backend.</li><li>Backend calls Meta's <code>/platform_integrity/verify</code> endpoint.</li><li>Backend validates nonce, timestamps, package, signing digest and device state.</li></ol><a class="doc-link" href="https://developers.meta.com/vr/documentation/android-apps/ps-attestation-api/" target="_blank" rel="noreferrer">META OFFICIAL ATTESTATION DOCS ↗</a></section>
+        <section class="surface"><span class="overline">ADB NETWORK MODEL</span><h3>Why a local companion?</h3><p>Render is a cloud server and cannot discover devices on your home Wi-Fi. Android Debug Bridge must execute on a computer with Android Platform Tools installed and network access to the Quest.</p><p>Run <code>python adb_agent.py</code> on that computer. Protect it with a strong <code>ADB_AGENT_TOKEN</code>; do not expose the companion publicly without a secure tunnel and origin restrictions.</p><p class="warning-text">The companion exposes only device listing, wireless pair/connect/disconnect and basic read-only device information. It does not root the headset or access another app's private data.</p></section>
+      </div>
+    </section>
+    <footer class="app-footer"><span>ATTESTATION STUDIO <i>·</i> QUEST SYSTEMS CONSOLE</span><span>SERVER-SIDE VERIFICATION / LOCAL DEVICE BRIDGE</span></footer>
+  </main>
+</div>
+<div class="toast-stack" id="toasts"></div>
+<script src="/app.js"></script>
+</body></html>
