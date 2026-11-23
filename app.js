@@ -83,4 +83,5 @@ async function runDiagnostics(){
  $("diagnosticRows").innerHTML=rows.map(([name,value,status,detail])=>`<div class="diag-row"><span class="diag-icon">${status==="ok"?"✓":status==="fail"?"!":"·"}</span><div><b>${escapeHtml(name)} — ${escapeHtml(value)}</b><small>${escapeHtml(detail)}</small></div><span class="diag-state ${status==="ok"?"ok":status==="fail"?"fail":""}">${status.toUpperCase()}</span></div>`).join("");$("diagUpdated").textContent="UPDATED "+new Date().toLocaleTimeString();
 }
 $("runDiagnostics").addEventListener("click",runDiagnostics);
+loadStudios();
 refreshHealth();
