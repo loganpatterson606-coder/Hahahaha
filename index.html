@@ -53,24 +53,43 @@
 
     <section class="view" id="view-adb">
       <div class="page-heading compact"><div><div class="overline">DEVICE MANAGEMENT / WIRELESS DEBUGGING</div><h1>ADB <em>Console.</em></h1><p>Pair and inspect a Quest through your trusted local computer bridge.</p></div><span class="tag" id="adbTag">BRIDGE CHECKING</span></div>
-      <div class="adb-layout">
-        <section class="surface">
-          <div class="surface-head"><div><span class="overline">01 / COMPANION LINK</span><h3>Local ADB bridge</h3></div><span class="status-pill" id="agentStatus"><i></i> CHECKING</span></div>
-          <label for="agentUrl">Companion address</label><div class="input-row"><input id="agentUrl" placeholder="http://192.168.1.20:8765" value="http://127.0.0.1:8765"><button class="button secondary" id="saveAgent">CONNECT</button></div><label for="agentToken">Companion access token</label><input id="agentToken" type="password" placeholder="Same ADB_AGENT_TOKEN configured on your PC" autocomplete="off">
-          <p class="field-help">The companion runs on your PC, not on Render. If using a phone browser, the companion must be reachable from that phone and browser security rules must permit the connection.</p>
-          <div class="bridge-banner"><span class="bridge-icon">⌁</span><div><b>ADB runs locally</b><small>Quest and PC must be on the same Wi-Fi network for wireless debugging.</small></div><span class="bridge-state" id="bridgeState">OFFLINE</span></div>
-          <div class="surface-head sub-head"><div><span class="overline">02 / WIRELESS PAIRING</span><h3>Pair a new device</h3></div></div>
+      <div class="adb-flow">
+        <div class="adb-loading hidden" id="adbLoading" aria-live="polite">
+          <div class="loading-orbit"><span></span></div><b>INITIALISING DEVICE LINK</b><small id="adbLoadingText">Checking the local ADB companion…</small>
+        </div>
+        <section class="surface adb-stage" id="adbPairStage">
+          <div class="surface-head"><div><span class="overline">01 / DEVICE PAIRING</span><h3>Pair your Quest</h3></div><span class="status-pill" id="agentStatus"><i></i> CHECKING</span></div>
+          <details class="companion-settings"><summary>Companion connection settings</summary>
+            <label for="agentUrl">Local companion address</label><div class="input-row"><input id="agentUrl" placeholder="http://192.168.1.20:8765" value="http://127.0.0.1:8765"><button class="button secondary" id="saveAgent">SAVE &amp; TEST</button></div>
+            <label for="agentToken">Companion access token</label><input id="agentToken" type="password" placeholder="Same ADB_AGENT_TOKEN configured on your PC" autocomplete="off">
+            <p class="field-help">The companion runs on your PC with Android Platform Tools. Your phone browser must be able to reach the PC over your local network.</p>
+          </details>
           <label for="pairEndpoint">Pairing IP address and port</label><input id="pairEndpoint" placeholder="192.168.1.45:37621" autocomplete="off">
           <label for="pairCode">Six-digit pairing code</label><div class="input-row"><input id="pairCode" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code"><button class="button primary" id="pairDevice">PAIR DEVICE</button></div>
-          <p class="field-help">On Quest: Settings → System → Developer → Wireless Debugging → Pair new device. Use the pairing port and code shown there.</p>
-          <div class="surface-head sub-head"><div><span class="overline">03 / CONNECT</span><h3>Connect paired device</h3></div></div>
-          <label for="connectEndpoint">Wireless debugging IP address and port</label><div class="input-row"><input id="connectEndpoint" placeholder="192.168.1.45:5555"><button class="button primary" id="connectDevice">CONNECT</button></div>
+          <p class="field-help">On Quest: Settings → System → Developer → Wireless Debugging → Pair new device. Enter the pairing endpoint and code shown on the headset.</p>
+          <div class="bridge-banner"><span class="bridge-icon">⌁</span><div><b>Secure local bridge</b><small id="bridgeState">Waiting for companion</small></div><span class="bridge-state" id="adbTag">PAIRING</span></div>
         </section>
-        <section class="surface device-surface">
+        <section class="surface adb-stage hidden" id="adbConnectStage">
+          <div class="surface-head"><div><span class="overline">02 / WIRELESS CONNECTION</span><h3>Connect paired Quest</h3></div><span class="status-pill"><i></i> PAIRED</span></div>
+          <label for="connectEndpoint">Wireless debugging IP address and port</label><div class="input-row"><input id="connectEndpoint" placeholder="192.168.1.45:5555"><button class="button primary" id="connectDevice">CONNECT DEVICE</button></div>
+          <p class="field-help">Use the main IP address and port shown on the Quest Wireless Debugging screen (not the temporary pairing port).</p>
+        </section>
+        <section class="surface adb-stage hidden" id="adbChoiceStage">
+          <div class="surface-head"><div><span class="overline">03 / DEVICE CAPABILITY</span><h3>Root capability detected</h3></div><span class="status-pill online"><i></i> ROOT AVAILABLE</span></div>
+          <p id="rootChoiceMessage" class="field-help">This device reports existing root access. Choose how you want to continue.</p>
+          <div class="root-choice-actions"><button class="button primary" id="useRootMode">USE ROOT DIAGNOSTICS</button><button class="button secondary" id="useAdbMode">ADB ONLY</button></div>
+          <p class="field-help">Root diagnostics are read-only and provide extra local system details. They do not improve or replace Meta attestation.</p>
+        </section>
+        <section class="surface adb-stage hidden" id="adbRootStage">
+          <div class="surface-head"><div><span class="overline">ROOT DIAGNOSTICS</span><h3>Read-only system checks</h3></div><span class="status-pill online"><i></i> ROOT CONFIRMED</span></div>
+          <div id="rootDiagnosticsOutput" class="root-diagnostics-output">Loading root diagnostics…</div>
+          <p class="field-help">Reported values come from the device and are not independently trusted or treated as a Meta integrity result.</p>
+          <button class="button secondary" id="rootBackToAdb">CONTINUE WITH ADB</button>
+        </section>
+        <section class="surface adb-stage hidden" id="adbOnlyStage">
           <div class="surface-head"><div><span class="overline">CONNECTED HARDWARE</span><h3>Device inventory</h3></div><button class="button tiny" id="refreshDevices">↻ REFRESH</button></div>
-          <div class="device-empty" id="deviceEmpty"><div class="empty-orbit"><span>⌁</span></div><b>No device selected</b><p>Pair and connect a Quest to populate device information here.</p></div>
-          <div id="deviceList" class="device-list"></div>
-          <div id="deviceInfo" class="device-info hidden"></div>
+          <div class="device-empty" id="deviceEmpty"><div class="empty-orbit"><span>⌁</span></div><b>No device selected</b><p>Connect a Quest to populate device information here.</p></div>
+          <div id="deviceList" class="device-list"></div><div id="deviceInfo" class="device-info hidden"></div>
           <div class="device-actions"><button class="button secondary" id="disconnectDevice">DISCONNECT SELECTED</button></div>
         </section>
       </div>
