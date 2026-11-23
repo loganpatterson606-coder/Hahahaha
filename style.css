@@ -13,3 +13,16 @@
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
 
 select{width:100%;background:#0c1117;border:1px solid #2b3540;border-radius:6px;color:#e7edf0;padding:11px 12px;outline:none;font-size:11px;transition:border .2s,box-shadow .2s}select option{background:#11161d;color:#e7edf0}
+
+/* Guided ADB pairing and root-choice flow */
+.adb-flow{position:relative;min-height:300px}.adb-stage{animation:rise .38s ease both}
+.adb-loading{min-height:300px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;border:1px solid var(--line);border-radius:10px;background:linear-gradient(145deg,#141b22ed,#11171d);animation:rise .25s ease}
+.adb-loading b{font:10px var(--mono);letter-spacing:1.4px;color:var(--mint)}.adb-loading small{font-size:10px;color:var(--muted)}
+.loading-orbit{width:68px;height:68px;border:1px solid #426653;border-radius:50%;display:grid;place-items:center;position:relative;animation:rotate 3s linear infinite}
+.loading-orbit:before{content:"";position:absolute;inset:7px;border:1px dashed #6f9b80;border-radius:50%}.loading-orbit span{width:10px;height:10px;border-radius:50%;background:var(--mint);box-shadow:0 0 22px #9ce5c1}
+.companion-settings{margin:2px 0 18px;border:1px solid var(--line);border-radius:7px;padding:10px 12px;background:#0c111755}.companion-settings summary{cursor:pointer;color:#aab4bc;font-size:10px;list-style:none}
+.companion-settings summary:after{content:"＋";float:right;color:var(--mint)}.companion-settings[open] summary:after{content:"−"}.companion-settings label{margin-top:12px}
+.root-choice-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:18px}.root-diagnostics-output{display:grid;gap:8px;margin:15px 0}
+.root-diag-row{display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px;background:#0b1117;border:1px solid #28343d;border-radius:6px}
+.root-diag-row span{font:8px var(--mono);color:var(--dim);letter-spacing:.6px}.root-diag-row b{font:10px/1.5 var(--mono);color:#cde8d8;overflow-wrap:anywhere}
+@media(max-width:700px){.root-choice-actions{display:grid}.root-choice-actions .button{width:100%}.root-diag-row{grid-template-columns:1fr;gap:5px}}
