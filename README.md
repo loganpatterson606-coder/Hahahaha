@@ -17,10 +17,32 @@ Start command:
 ```bash
 gunicorn app:app
 ```
-Set the following Render environment variables:
-- `META_APP_ACCESS_TOKEN` — Meta app access token (`OC|APP_ID|APP_SECRET`); keep it server-side.
-- `META_PACKAGE_ID` — exact package ID of your own app.
-- `META_ALLOWED_CERT_SHA256` — expected signing certificate SHA-256 digest(s), comma-separated.
+## Configure registered studios (required)
+
+In Render → your service → Environment, add one variable named `STUDIO_PROFILES_JSON`. Its value is a JSON array. Each studio has its own Meta App Access Token, package ID, signing-certificate SHA-256 allow-list, and authorised Quest serial-number allow-list. Example (replace every placeholder with your real values):
+
+```json
+[
+  {
+    "id": "studio-one",
+    "name": "Studio One",
+    "package_id": "com.example.questapp",
+    "access_token": "OC|YOUR_APP_ID|YOUR_APP_SECRET",
+    "allowed_cert_sha256": [
+      "REPLACE_WITH_64_HEX_CHARACTER_SHA256_DIGEST"
+    ],
+    "allowed_device_serials": [
+      "REPLACE_WITH_REGISTERED_QUEST_SERIAL"
+    ]
+  }
+]
+```
+
+Add one object per studio. The `id` must be unique and contain only letters, numbers, underscores or hyphens. The package ID must be the exact Android package ID for that studio's own app. Add each authorised device serial exactly as provided by your device inventory. Keep this variable private in Render; never put App Access Tokens, App Secrets, certificate digests or serial allow-lists in frontend files or GitHub.
+
+The browser receives only studio IDs and display names. When a user selects a studio and enters a serial, the backend checks the serial against that studio's server-side allow-list before issuing a challenge. The challenge permanently records the studio, registered serial, package ID and nonce. During verification, the backend selects that studio's private Meta credential and rechecks that the device remains registered. A successful serial lookup is only an association check; only a genuine Meta-issued token passing provider verification and the configured claim policy can produce a Verified result.
+
+The older single-studio environment variables are supported only if `META_ALLOWED_DEVICE_SERIALS` is also configured. For new deployments, use `STUDIO_PROFILES_JSON`.
 
 The app uses SQLite for single-use challenges. For multi-instance/high-availability deployments, move challenge storage to managed PostgreSQL/Redis and configure persistent storage appropriately.
 
