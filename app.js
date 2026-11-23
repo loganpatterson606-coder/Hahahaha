@@ -1,5 +1,6 @@
 const $ = id => document.getElementById(id);
-const state = {view:"overview", challenge:null, selectedDevice:null, devices:[], agentUrl:localStorage.getItem("adbAgentUrl")||"http://127.0.0.1:8765", agentToken:localStorage.getItem("adbAgentToken")||""};\n$("agentUrl").value=state.agentUrl; $("agentToken").value=state.agentToken;
+const state = {view:"overview", challenge:null, selectedDevice:null, devices:[], agentUrl:localStorage.getItem("adbAgentUrl")||"http://127.0.0.1:8765", agentToken:localStorage.getItem("adbAgentToken")||""};
+$("agentUrl").value=state.agentUrl; $("agentToken").value=state.agentToken;
 const navNames = {overview:"Overview",adb:"ADB Console",attestation:"Meta Attestation",diagnostics:"Diagnostics"};
 function toast(message, error=false){const el=document.createElement("div");el.className="toast"+(error?" error":"");el.textContent=message;$("toasts").append(el);setTimeout(()=>el.remove(),3800)}
 function log(message, kind=""){const el=document.createElement("div");el.className="terminal-line "+kind;const stamp=new Date().toLocaleTimeString();el.innerHTML=`<span>${stamp}</span>${escapeHtml(message)}`;$("terminal").append(el);$("terminal").scrollTop=$("terminal").scrollHeight}
