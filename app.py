@@ -4,6 +4,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import secrets
 import sqlite3
 import time
@@ -53,13 +54,22 @@ def init_db() -> None:
                 nonce TEXT NOT NULL UNIQUE,
                 package_id TEXT NOT NULL,
                 session_ref TEXT NOT NULL,
+                studio_id TEXT NOT NULL DEFAULT 'default',
+                device_serial TEXT NOT NULL DEFAULT '',
                 created_at INTEGER NOT NULL,
                 expires_at INTEGER NOT NULL,
                 state TEXT NOT NULL DEFAULT 'pending',
                 used_at INTEGER
             )
         """)
+        # Migrate existing deployments without discarding outstanding challenge history.
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(challenges)")}
+        if "studio_id" not in columns:
+            conn.execute("ALTER TABLE challenges ADD COLUMN studio_id TEXT NOT NULL DEFAULT 'default'")
+        if "device_serial" not in columns:
+            conn.execute("ALTER TABLE challenges ADD COLUMN device_serial TEXT NOT NULL DEFAULT ''")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_challenges_expiry ON challenges(expires_at)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_challenges_studio ON challenges(studio_id, device_serial)")
 
 
 init_db()
@@ -81,20 +91,75 @@ def b64url_decode_json(value: str) -> dict[str, Any]:
     return obj
 
 
-def configured_meta() -> tuple[str, str, set[str]]:
+def _normalise_certs(values: Any) -> set[str]:
+    if isinstance(values, str):
+        values = values.replace("\\n", ",").split(",")
+    if not isinstance(values, list):
+        return set()
+    certs = {re.sub(r"[^0-9a-f]", "", str(item).lower()) for item in values if str(item).strip()}
+    return {cert for cert in certs if len(cert) == 64}
+
+
+def load_studios() -> dict[str, dict[str, Any]]:
+    """Load private per-studio Meta configuration from STUDIO_PROFILES_JSON.
+
+    Expected format: a JSON array of objects with id, name, package_id,
+    access_token, allowed_cert_sha256 and allowed_device_serials.
+    """
+    raw = os.environ.get("STUDIO_PROFILES_JSON", "").strip()
+    if raw:
+        try:
+            entries = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            app.logger.error("STUDIO_PROFILES_JSON is invalid JSON: %s", exc)
+            return {}
+        if not isinstance(entries, list):
+            app.logger.error("STUDIO_PROFILES_JSON must be a JSON array")
+            return {}
+        profiles: dict[str, dict[str, Any]] = {}
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            studio_id = str(entry.get("id", "")).strip()
+            name = str(entry.get("name", "")).strip()
+            package_id = str(entry.get("package_id", "")).strip()
+            access_token = str(entry.get("access_token", "")).strip()
+            certs = _normalise_certs(entry.get("allowed_cert_sha256", []))
+            serials_raw = entry.get("allowed_device_serials", [])
+            serials = {str(value).strip() for value in serials_raw if str(value).strip()} if isinstance(serials_raw, list) else set()
+            if (not re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", studio_id)
+                    or not name or len(name) > 100
+                    or not re.fullmatch(r"[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+", package_id)
+                    or not access_token or not certs or not serials):
+                app.logger.warning("Skipping incomplete or invalid studio profile: %s", studio_id or "(no id)")
+                continue
+            profiles[studio_id] = {
+                "id": studio_id, "name": name, "package_id": package_id,
+                "access_token": access_token, "certs": certs, "serials": serials,
+            }
+        return profiles
+
+    # Backwards-compatible single-studio setup. A serial allow-list is still required.
     access_token = os.environ.get("META_APP_ACCESS_TOKEN", "").strip()
     package_id = os.environ.get("META_PACKAGE_ID", "").strip()
-    certs_raw = os.environ.get("META_ALLOWED_CERT_SHA256", "")
-    certs = {
-        re.sub(r"[^0-9a-f]", "", item.lower())
-        for item in certs_raw.replace("\n", ",").split(",")
-        if item.strip()
-    }
-    certs = {c for c in certs if len(c) == 64}
-    return access_token, package_id, certs
+    certs = _normalise_certs(os.environ.get("META_ALLOWED_CERT_SHA256", ""))
+    serials = {item.strip() for item in os.environ.get("META_ALLOWED_DEVICE_SERIALS", "").split(",") if item.strip()}
+    if access_token and package_id and certs and serials:
+        return {"default": {
+            "id": "default", "name": os.environ.get("META_STUDIO_NAME", "Default Studio").strip(),
+            "package_id": package_id, "access_token": access_token,
+            "certs": certs, "serials": serials,
+        }}
+    return {}
 
 
-import re
+def configured_meta() -> tuple[str, str, set[str]]:
+    profiles = load_studios()
+    if len(profiles) == 1:
+        profile = next(iter(profiles.values()))
+        return profile["access_token"], profile["package_id"], profile["certs"]
+    return "", "", set()
+
 
 
 @app.get("/")
@@ -115,15 +180,18 @@ def javascript():
 @app.get("/health")
 @app.get("/api/health")
 def health():
-    access, package, certs = configured_meta()
+    profiles = load_studios()
+    configured = len(profiles)
+    cert_count = sum(len(profile["certs"]) for profile in profiles.values())
     return jsonify({
         "ok": True,
         "service": "Attestation Studio",
-        "meta_configured": bool(access and package and certs),
+        "meta_configured": configured > 0,
         "meta": {
-            "access_token_present": bool(access),
-            "package_id_present": bool(package),
-            "certificate_fingerprints_configured": len(certs),
+            "access_token_present": configured > 0,
+            "package_id_present": configured > 0,
+            "certificate_fingerprints_configured": cert_count,
+            "studio_profiles_configured": configured,
             "verification_endpoint": META_VERIFY_URL,
         },
         "adb": {
@@ -136,29 +204,43 @@ def health():
     })
 
 
+@app.get("/api/studios")
+def public_studios():
+    # Never return access tokens, certificate digests or device serials to the browser.
+    profiles = load_studios()
+    return jsonify({
+        "ok": True,
+        "studios": [{"id": p["id"], "name": p["name"]} for p in profiles.values()],
+        "configured": bool(profiles),
+    })
+
+
 @app.get("/api/config")
 def public_config():
-    _, package, _ = configured_meta()
     return jsonify({
-        "default_package_id": package,
         "challenge_ttl_seconds": CHALLENGE_TTL,
-        "meta_configured": bool(configured_meta()[0] and package and configured_meta()[2]),
+        "meta_configured": bool(load_studios()),
     })
 
 
 @app.post("/api/challenge")
 def create_challenge():
     data = request.get_json(silent=True) or {}
-    _, configured_package, _ = configured_meta()
-    package_id = str(data.get("package_id") or configured_package).strip()
-    session_ref = str(data.get("session_ref") or "dashboard-test").strip()
+    studio_id = str(data.get("studio_id", "")).strip()
+    device_serial = str(data.get("device_serial", "")).strip()
+    session_ref = str(data.get("session_ref") or "studio-session").strip()
+    profiles = load_studios()
+    profile = profiles.get(studio_id)
 
-    if not package_id or len(package_id) > 255 or not re.fullmatch(r"[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)+", package_id):
-        return error("Enter a valid Android package ID, for example com.example.questapp.")
+    if not profile:
+        return error("Choose a configured studio. No matching studio profile is available.", 422)
+    if not device_serial or len(device_serial) > 128 or any(ord(ch) < 33 or ord(ch) > 126 for ch in device_serial):
+        return error("Enter a valid Quest device serial number.", 400)
+    if device_serial not in profile["serials"]:
+        return error("This device serial is not registered to the selected studio.", 403)
     if len(session_ref) > 128:
         return error("Session reference must be 128 characters or fewer.")
 
-    # 32 random bytes -> 43-char unpadded Base64URL nonce, within Meta's 22-172 range.
     nonce = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode("ascii").rstrip("=")
     challenge_id = secrets.token_urlsafe(18)
     now = int(time.time())
@@ -167,9 +249,11 @@ def create_challenge():
     with db_session() as conn:
         conn.execute(
             """INSERT INTO challenges
-               (challenge_id, nonce, package_id, session_ref, created_at, expires_at, state)
-               VALUES (?, ?, ?, ?, ?, ?, 'pending')""",
-            (challenge_id, nonce, package_id, session_ref, now, expires),
+               (challenge_id, nonce, package_id, session_ref, studio_id, device_serial,
+                created_at, expires_at, state)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')""",
+            (challenge_id, nonce, profile["package_id"], session_ref, studio_id,
+             device_serial, now, expires),
         )
         conn.execute("DELETE FROM challenges WHERE expires_at < ?", (now - 86400,))
 
@@ -177,7 +261,10 @@ def create_challenge():
         "ok": True,
         "challenge_id": challenge_id,
         "challenge_nonce": nonce,
-        "package_id": package_id,
+        "studio_id": studio_id,
+        "studio_name": profile["name"],
+        "device_serial": device_serial,
+        "package_id": profile["package_id"],
         "session_ref": session_ref,
         "created_at": now,
         "expires_at": expires,
@@ -313,23 +400,21 @@ def verify_meta():
         return error("challenge_id, challenge_nonce and attestation_token are required.")
     if len(token) > 24000:
         return error("Attestation token exceeds the 24 KB request limit.")
-    access_token, expected_package, allowed_certs = configured_meta()
-    if not access_token or not expected_package or not allowed_certs:
-        return error(
-            "Meta verification is not configured. Add META_APP_ACCESS_TOKEN, META_PACKAGE_ID and META_ALLOWED_CERT_SHA256 in Render Environment.",
-            503,
-        )
 
     with reserve_challenge(challenge_id, nonce) as (challenge, _):
         if not challenge:
             return error("Challenge is invalid, expired, already processing, or already used.", 409)
 
-        if challenge["package_id"] != expected_package:
+        profile = load_studios().get(challenge["studio_id"])
+        if not profile or challenge["device_serial"] not in profile["serials"]:
             finish_challenge(challenge_id, False)
-            return error("Challenge package does not match the server-configured META_PACKAGE_ID.", 422)
+            return error("Studio profile or device registration is no longer valid.", 403)
+        if challenge["package_id"] != profile["package_id"]:
+            finish_challenge(challenge_id, False)
+            return error("Challenge package does not match the selected studio profile.", 422)
 
         try:
-            claims = verify_with_meta(token, access_token)
+            claims = verify_with_meta(token, profile["access_token"])
         except requests.Timeout:
             finish_challenge(challenge_id, False)
             return error("Meta verification timed out. The challenge remains reusable until expiry.", 504)
@@ -341,13 +426,16 @@ def verify_meta():
             finish_challenge(challenge_id, False)
             return error(f"Meta verification failed: {exc}", 401)
 
-        issues = evaluate_claims(claims, challenge, allowed_certs)
+        issues = evaluate_claims(claims, challenge, profile["certs"])
         finish_challenge(challenge_id, True)
         return jsonify({
             "ok": not issues,
             "provider_verified": True,
             "policy_passed": not issues,
             "provider": "Meta Platform Attestation",
+            "studio_id": challenge["studio_id"],
+            "studio_name": profile["name"],
+            "device_serial": challenge["device_serial"],
             "package_id": claims.get("app_state", {}).get("package_id"),
             "app_integrity_state": claims.get("app_state", {}).get("app_integrity_state"),
             "device_integrity_state": claims.get("device_state", {}).get("device_integrity_state"),
