@@ -2,7 +2,19 @@
 
 A Discord bot with entertainment commands, games, XP/coins, polls, and permission-checked moderation tools.
 
-## Deploy on Render
+## Website
+
+A responsive static website and command directory is included in [website/](website/index.html). It uses the supplied dark dashboard visual style and is independent of the bot process.
+
+To publish it with GitHub Pages:
+1. Open the repository **Settings → Pages**.
+2. Under **Build and deployment**, choose **Deploy from a branch**.
+3. Select branch `main` and folder `/website`, then save.
+4. GitHub Pages will show the published website URL in the Pages settings.
+
+The site is a project/command showcase. It does not expose the bot token or claim a live connection to Discord.
+
+## Deploy the Discord bot on Render
 
 This repository includes `render.yaml` configured as a **Background Worker**. A Discord bot needs a persistent outbound gateway connection; it is not a normal web service.
 
