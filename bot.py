@@ -1,4 +1,4 @@
-import os, random, asyncio
+import os, random, asyncio, sqlite3
 from datetime import datetime, timezone
 from collections import Counter
 import discord
@@ -28,6 +28,27 @@ class HahahaBot(commands.Bot):
 bot = HahahaBot(command_prefix=commands.when_mentioned_or(PREFIX), intents=intents, help_command=None)
 started = datetime.now(timezone.utc)
 xp, coins, warnings, polls = Counter(), Counter(), Counter(), {}
+
+# Per-server response customisations. SQLite keeps settings across ordinary bot restarts.
+DB_PATH = os.getenv("BOT_DATABASE", os.path.join(os.path.dirname(__file__), "bot_data.sqlite3"))
+db = sqlite3.connect(DB_PATH)
+db.execute("""CREATE TABLE IF NOT EXISTS custom_responses (
+    guild_id INTEGER NOT NULL, category TEXT NOT NULL, response TEXT NOT NULL,
+    PRIMARY KEY (guild_id, category, response)
+)""")
+db.commit()
+
+def custom_responses(guild_id, category):
+    if not guild_id:
+        return []
+    rows = db.execute(
+        "SELECT response FROM custom_responses WHERE guild_id=? AND category=? ORDER BY rowid",
+        (guild_id, category)
+    ).fetchall()
+    return [row[0] for row in rows]
+
+def response_pool(ctx, category, defaults):
+    return list(defaults) + custom_responses(ctx.guild.id if ctx.guild else None, category)
 
 def owner_only():
     return commands.check(lambda ctx: ctx.author.id == OWNER_ID)
@@ -123,11 +144,78 @@ BITS = {
 }
 def make_generated_command(lines):
     async def generated(ctx):
-        await say(ctx, random.choice(lines))
+        category = generated.__name__
+        await say(ctx, random.choice(response_pool(ctx, category, lines)))
     return generated
 
 for name, lines in BITS.items():
-    bot.hybrid_command(name=name)(make_generated_command(lines))
+    callback = make_generated_command(lines)
+    callback.__name__ = name
+    bot.hybrid_command(name=name)(callback)
+
+@bot.hybrid_command(name="addresponse", description="Add a custom response to any fun command")
+@commands.has_permissions(manage_guild=True)
+async def addresponse(ctx, category: str, *, response: str):
+    category = category.lower().strip()
+    if not ctx.guild:
+        return await say(ctx, "Use this command inside a server.")
+    if category not in BITS:
+        return await say(ctx, "Unknown category. Use /settings to see every customisable category.")
+    response = response.strip()
+    if not response or len(response) > 1800:
+        return await say(ctx, "Response must be between 1 and 1800 characters.")
+    db.execute(
+        "INSERT OR IGNORE INTO custom_responses (guild_id, category, response) VALUES (?, ?, ?)",
+        (ctx.guild.id, category, response)
+    )
+    db.commit()
+    await say(ctx, f"Added a custom {category} response for this server.")
+
+@bot.hybrid_command(name="setresponse", description="Replace custom responses for a fun command")
+@commands.has_permissions(manage_guild=True)
+async def setresponse(ctx, category: str, *, response: str):
+    category = category.lower().strip()
+    if not ctx.guild:
+        return await say(ctx, "Use this command inside a server.")
+    if category not in BITS:
+        return await say(ctx, "Unknown category. Use /settings to see every customisable category.")
+    response = response.strip()
+    if not response or len(response) > 1800:
+        return await say(ctx, "Response must be between 1 and 1800 characters.")
+    db.execute("DELETE FROM custom_responses WHERE guild_id=? AND category=?", (ctx.guild.id, category))
+    db.execute(
+        "INSERT INTO custom_responses (guild_id, category, response) VALUES (?, ?, ?)",
+        (ctx.guild.id, category, response)
+    )
+    db.commit()
+    await say(ctx, f"Replaced this server's custom {category} responses.")
+
+@bot.hybrid_command(name="resetresponse", description="Remove custom responses for a fun command")
+@commands.has_permissions(manage_guild=True)
+async def resetresponse(ctx, category: str):
+    category = category.lower().strip()
+    if not ctx.guild:
+        return await say(ctx, "Use this command inside a server.")
+    if category not in BITS:
+        return await say(ctx, "Unknown category. Use /settings to see every customisable category.")
+    db.execute("DELETE FROM custom_responses WHERE guild_id=? AND category=?", (ctx.guild.id, category))
+    db.commit()
+    await say(ctx, f"Reset {category} to the built-in responses.")
+
+@bot.hybrid_command(name="settings", description="Show this server's fun-command customisations")
+async def settings(ctx):
+    if not ctx.guild:
+        return await say(ctx, "Use this command inside a server.")
+    rows = db.execute(
+        "SELECT category, COUNT(*) FROM custom_responses WHERE guild_id=? GROUP BY category ORDER BY category",
+        (ctx.guild.id,)
+    ).fetchall()
+    lines = [f"{category}: {count} custom response(s)" for category, count in rows]
+    categories = ", ".join(sorted(BITS))
+    await say(ctx, "**HAHAHA BOT customisation**\\n"
+                   + ("\\n".join(lines) if lines else "No custom responses yet.")
+                   + f"\\n\\n**Available categories:** {categories}"
+                   + "\\nUse /addresponse, /setresponse, or /resetresponse. Requires Manage Server.")
 
 @bot.hybrid_command()
 async def guess(ctx, number:int):
