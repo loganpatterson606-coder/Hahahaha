@@ -15,7 +15,17 @@ if not TOKEN or not OWNER_ID:
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
-bot = commands.Bot(command_prefix=commands.when_mentioned_or(PREFIX), intents=intents, help_command=None)
+class HahahaBot(commands.Bot):
+    async def setup_hook(self):
+        # Register slash commands with Discord when the bot starts.
+        try:
+            synced = await self.tree.sync()
+            print(f"Synced {len(synced)} slash commands with Discord.")
+        except Exception as exc:
+            print(f"Slash-command sync failed: {type(exc).__name__}: {exc}")
+            raise
+
+bot = HahahaBot(command_prefix=commands.when_mentioned_or(PREFIX), intents=intents, help_command=None)
 started = datetime.now(timezone.utc)
 xp, coins, warnings, polls = Counter(), Counter(), Counter(), {}
 
@@ -42,32 +52,32 @@ async def on_command_error(ctx, error):
     if isinstance(error, commands.MissingRequiredArgument): return await say(ctx, f"Missing: {error.param.name}")
     await say(ctx, f"Command error: {type(error).__name__}")
 
-@bot.command(name="help")
+@bot.hybrid_command(name="help")
 async def help_cmd(ctx):
     names = sorted(c.name for c in bot.commands if not c.hidden)
     await say(ctx, f"HAHAHA BOT — {len(names)} commands\n" + " • ".join(f"{PREFIX}{n}" for n in names[:110]))
 
-@bot.command()
+@bot.hybrid_command()
 async def ping(ctx): await say(ctx, f"Pong! {round(bot.latency*1000)}ms")
-@bot.command()
+@bot.hybrid_command()
 async def uptime(ctx): await say(ctx, str(datetime.now(timezone.utc)-started).split(".")[0])
-@bot.command()
+@bot.hybrid_command()
 async def serverinfo(ctx): await say(ctx, f"{ctx.guild.name} • {ctx.guild.member_count} members")
-@bot.command()
+@bot.hybrid_command()
 async def userinfo(ctx, member:discord.Member=None):
     m=member or ctx.author
     await say(ctx, f"{m} • ID {m.id} • joined {m.joined_at}")
-@bot.command()
+@bot.hybrid_command()
 async def avatar(ctx, member:discord.Member=None): await say(ctx, (member or ctx.author).display_avatar.url)
-@bot.command()
+@bot.hybrid_command()
 async def saytext(ctx, *, text): await say(ctx, text)
-@bot.command()
+@bot.hybrid_command()
 async def choose(ctx, *, choices):
     opts=[x.strip() for x in choices.split("|") if x.strip()]
     await say(ctx, random.choice(opts) if len(opts)>1 else "Use option 1 | option 2.")
-@bot.command()
+@bot.hybrid_command()
 async def coinflip(ctx): await say(ctx, random.choice(["Heads","Tails"]))
-@bot.command()
+@bot.hybrid_command()
 async def dice(ctx, sides:int=6):
     if not 2<=sides<=1000: return await say(ctx,"Choose 2–1000 sides.")
     await say(ctx, f"🎲 {random.randint(1,sides)}")
@@ -114,45 +124,45 @@ BITS = {
 for name, lines in BITS.items():
     async def generated(ctx, _lines=lines):
         await say(ctx, random.choice(_lines))
-    bot.command(name=name)(generated)
+    bot.hybrid_command(name=name)(generated)
 
-@bot.command()
+@bot.hybrid_command()
 async def guess(ctx, number:int):
     if not 1<=number<=10: return await say(ctx,"Pick 1–10.")
     n=random.randint(1,10); await say(ctx,"Correct!" if n==number else f"Nope — it was {n}.")
-@bot.command()
+@bot.hybrid_command()
 async def rps(ctx, choice:str):
     opts=["rock","paper","scissors"]; choice=choice.lower()
     if choice not in opts: return await say(ctx,"Use rock, paper, or scissors.")
     cpu=random.choice(opts)
     win=(choice,cpu) in [("rock","scissors"),("paper","rock"),("scissors","paper")]
     await say(ctx,f"You: {choice} • Me: {cpu} — {'Draw!' if choice==cpu else 'You win!' if win else 'I win!'}")
-@bot.command()
+@bot.hybrid_command()
 async def slots(ctx):
     row=[random.choice(["🍒","🍋","💎","7️⃣","🍀"]) for _ in range(3)]
     coins[ctx.author.id]+=10 if len(set(row))==1 else 1
     await say(ctx," | ".join(row)+(" JACKPOT +10!" if len(set(row))==1 else " +1 coin"))
-@bot.command()
+@bot.hybrid_command()
 async def balance(ctx): await say(ctx,f"{coins[ctx.author.id]} coins")
-@bot.command()
+@bot.hybrid_command()
 async def daily(ctx):
     coins[ctx.author.id]+=25; await say(ctx,"Daily reward: +25 coins.")
-@bot.command()
+@bot.hybrid_command()
 async def leaderboard(ctx):
     rows=coins.most_common(10)
     await say(ctx,"Coin leaderboard\n"+("\n".join(f"{i+1}. <@{u}> — {v}" for i,(u,v) in enumerate(rows)) or "No coins yet."))
-@bot.command()
+@bot.hybrid_command()
 async def level(ctx): await say(ctx,f"XP {xp[ctx.author.id]} • Level {xp[ctx.author.id]//100}")
-@bot.command()
+@bot.hybrid_command()
 async def roll(ctx, maximum:int=100):
     if not 1<=maximum<=1000000: return await say(ctx,"Maximum: 1–1,000,000.")
     await say(ctx,str(random.randint(1,maximum)))
-@bot.command()
+@bot.hybrid_command()
 async def trivia(ctx):
     q,a=random.choice([("Red Planet?","Mars"),("Hexagon sides?","6"),("Largest ocean?","Pacific")])
     await say(ctx,f"{q} ||{a}||")
 
-@bot.command()
+@bot.hybrid_command()
 async def poll(ctx, *, prompt):
     parts=[p.strip() for p in prompt.split("|") if p.strip()]
     if not 3<=len(parts)<=11: return await say(ctx,f"Use {PREFIX}poll Question | Option A | Option B.")
@@ -161,7 +171,7 @@ async def poll(ctx, *, prompt):
     emojis=["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟"]
     for e in emojis[:len(opts)]: await msg.add_reaction(e)
     polls[msg.id]={"options":opts,"channel":ctx.channel.id}
-@bot.command()
+@bot.hybrid_command()
 async def pollresult(ctx, message_id:int):
     p=polls.get(message_id)
     if not p: return await say(ctx,"Poll not found (poll data lasts until restart).")
@@ -170,78 +180,78 @@ async def pollresult(ctx, message_id:int):
     for i,o in enumerate(p["options"]):
         r=discord.utils.get(msg.reactions,emoji=es[i]); result.append(f"{o}: {max(0,r.count-1) if r else 0}")
     await say(ctx,"Actual votes\n"+"\n".join(result))
-@bot.command(hidden=True)
+@bot.hybrid_command(hidden=True)
 @owner_only()
 async def prankpollpreview(ctx, message_id:int, option_number:int, fake_votes:int=100):
     p=polls.get(message_id)
     if not p or not 1<=option_number<=len(p["options"]) or not 1<=fake_votes<=10000:
         return await say(ctx,"Invalid poll, option, or preview count.")
     await say(ctx,f"SIMULATED PRANK PREVIEW — NOT REAL VOTES\n{p['options'][option_number-1]}: {fake_votes} imaginary votes. Actual totals unchanged.")
-@bot.command(hidden=True)
+@bot.hybrid_command(hidden=True)
 @owner_only()
 async def ownerpanel(ctx): await say(ctx,f"Owner panel for {OWNER_ID}: prankpollpreview, shutdown")
-@bot.command(hidden=True)
+@bot.hybrid_command(hidden=True)
 @owner_only()
 async def shutdown(ctx):
     await say(ctx,"Bot shutting down."); await bot.close()
 
-@bot.command()
+@bot.hybrid_command()
 @commands.has_permissions(kick_members=True)
 async def kick(ctx, member:discord.Member, *, reason="No reason provided"):
     await member.kick(reason=reason); await say(ctx,f"Kicked {member}.")
-@bot.command()
+@bot.hybrid_command()
 @commands.has_permissions(ban_members=True)
 async def ban(ctx, member:discord.Member, *, reason="No reason provided"):
     await member.ban(reason=reason); await say(ctx,f"Banned {member}.")
-@bot.command()
+@bot.hybrid_command()
 @commands.has_permissions(manage_messages=True)
 async def clear(ctx, amount:int=5):
     if not 1<=amount<=100: return await say(ctx,"Choose 1–100.")
     deleted=await ctx.channel.purge(limit=amount+1); await ctx.send(f"Deleted {len(deleted)-1}.",delete_after=5)
-@bot.command()
+@bot.hybrid_command()
 @commands.has_permissions(manage_channels=True)
 async def slowmode(ctx, seconds:int):
     if not 0<=seconds<=21600: return await say(ctx,"Choose 0–21600 seconds.")
     await ctx.channel.edit(slowmode_delay=seconds); await say(ctx,f"Slowmode: {seconds}s.")
-@bot.command()
+@bot.hybrid_command()
 @commands.has_permissions(manage_channels=True)
 async def lock(ctx):
     ow=ctx.channel.overwrites_for(ctx.guild.default_role); ow.send_messages=False
     await ctx.channel.set_permissions(ctx.guild.default_role,overwrite=ow); await say(ctx,"Channel locked.")
-@bot.command()
+@bot.hybrid_command()
 @commands.has_permissions(manage_channels=True)
 async def unlock(ctx):
     ow=ctx.channel.overwrites_for(ctx.guild.default_role); ow.send_messages=None
     await ctx.channel.set_permissions(ctx.guild.default_role,overwrite=ow); await say(ctx,"Channel unlocked.")
-@bot.command()
+@bot.hybrid_command()
 @commands.has_permissions(manage_messages=True)
 async def warn(ctx, member:discord.Member, *, reason="No reason provided"):
     warnings[(ctx.guild.id,member.id)]+=1; await say(ctx,f"{member.mention} warned. Total: {warnings[(ctx.guild.id,member.id)]}. {reason}")
-@bot.command()
+@bot.hybrid_command()
 async def hug(ctx, member:discord.Member): await say(ctx,f"{ctx.author.mention} hugs {member.mention}!")
-@bot.command()
+@bot.hybrid_command()
 async def slap(ctx, member:discord.Member): await say(ctx,f"Cartoon bonk for {member.mention}!")
-@bot.command()
+@bot.hybrid_command()
 async def highfive(ctx, member:discord.Member): await say(ctx,f"{ctx.author.mention} high-fives {member.mention}!")
-@bot.command()
+@bot.hybrid_command()
 async def bonk(ctx, member:discord.Member): await say(ctx,f"BONK! {member.mention}, meme jail.")
-@bot.command()
+@bot.hybrid_command()
 async def reverse(ctx, *, text): await say(ctx,text[::-1][:1900])
-@bot.command()
+@bot.hybrid_command()
 async def claptext(ctx, *, text): await say(ctx," 👏 ".join(text.split())[:1900])
-@bot.command()
+@bot.hybrid_command()
 async def mocktext(ctx, *, text): await say(ctx,"".join(c.upper() if i%2 else c.lower() for i,c in enumerate(text))[:1900])
-@bot.command()
+@bot.hybrid_command()
 async def spoilertext(ctx, *, text): await say(ctx,f"||{text}||")
-@bot.command()
+@bot.hybrid_command()
 async def membercount(ctx): await say(ctx,f"{ctx.guild.member_count}")
-@bot.command()
+@bot.hybrid_command()
 async def userid(ctx, member:discord.Member=None): await say(ctx,f"{(member or ctx.author).id}")
-@bot.command()
+@bot.hybrid_command()
 async def serverid(ctx): await say(ctx,f"{ctx.guild.id}")
-@bot.command()
+@bot.hybrid_command()
 async def timestamp(ctx): await say(ctx,f"<t:{int(datetime.now(timezone.utc).timestamp())}:F>")
-@bot.command()
+@bot.hybrid_command()
 async def countdown(ctx, seconds:int):
     if not 1<=seconds<=10: return await say(ctx,"Choose 1–10.")
     m=await ctx.send(str(seconds))
