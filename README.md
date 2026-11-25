@@ -50,3 +50,13 @@ Server members with **Manage Server** can customise every built-in fun-response 
 - `/settings` — list categories and show which ones have custom responses.
 
 Category names are shown by `/settings`. Custom responses are stored in a local SQLite database. On Render, attach a persistent disk and set `BOT_DATABASE` to a path on that disk if you want settings to survive redeploys; otherwise the platform may discard the database during a new deploy.
+
+## Polls, giveaways, and Spotify
+
+- `/pollbuilder` opens a form for a poll question, options, duration, and outcome mode. Normal polls count button votes. The selected-member mode is explicitly labelled as an admin-selected outcome in the public post.
+- `/giveaway` opens a form for the prize, duration, and winner mode. Random mode selects from members who entered. Selected mode publicly labels the chosen member as admin-selected, not a random winner.
+- `/song` opens Spotify search and returns track links. Add `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` to Render environment variables from a Spotify Developer application.
+- Spotify's Web API does not provide audio streams for a Discord bot to relay in voice chat. This implementation searches Spotify and links to tracks; it does not play audio in a Discord voice channel.
+- `/customizer` includes the response editor, poll builder, giveaway builder, and Spotify search.
+
+Admin-selected poll and giveaway outcomes are deliberately disclosed in the posted message; they are not presented as genuine random or vote-counted results.
