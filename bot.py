@@ -278,14 +278,25 @@ class CustomCategorySelect(discord.ui.Select):
     def __init__(self):
         options = [
             discord.SelectOption(label=name, value=name, description=f"Edit {name} output")
-            for name in sorted(BITS)[:25]
+            for name in sorted(BITS)[:22]
+        ] + [
+            discord.SelectOption(label="Poll builder", value="__poll__", description="Configure a poll"),
+            discord.SelectOption(label="Giveaway builder", value="__giveaway__", description="Configure a giveaway"),
+            discord.SelectOption(label="Spotify search", value="__song__", description="Search Spotify")
         ]
         super().__init__(placeholder="Choose what you want to customise", min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
         if not interaction.user.guild_permissions.manage_guild:
             return await interaction.response.send_message("Manage Server permission required.", ephemeral=True)
-        await interaction.response.send_modal(ResponseConfigModal(self.values[0]))
+        selected = self.values[0]
+        if selected == "__poll__":
+            return await interaction.response.send_modal(PollBuilderModal())
+        if selected == "__giveaway__":
+            return await interaction.response.send_modal(GiveawayModal())
+        if selected == "__song__":
+            return await interaction.response.send_modal(SpotifyModal())
+        await interaction.response.send_modal(ResponseConfigModal(selected))
 
 
 class CustomizerView(discord.ui.View):
@@ -371,13 +382,14 @@ class PollBuilderModal(discord.ui.Modal, title="Create a poll"):
         embed.add_field(name="Outcome", value="Vote-counted" if target is None else "ADMIN-SELECTED: " + target.mention)
         embed.set_footer(text="Admin-selected outcome is disclosed; this is not a democratic result." if target else "One vote per member.")
         await interaction.response.send_message("Poll posted.", ephemeral=True)
-        await interaction.channel.send(embed=embed, view=view)
+        view.message = await interaction.channel.send(embed=embed, view=view)
 
 
 class PollVoteView(discord.ui.View):
     def __init__(self, choices, duration, target, channel):
         super().__init__(timeout=duration)
         self.choices, self.target, self.channel, self.votes = choices, target, channel, {}
+        self.message = None
         for i, choice in enumerate(choices):
             button = discord.ui.Button(label=choice[:80], style=discord.ButtonStyle.primary)
             button.callback = self.callback_for(i)
@@ -399,7 +411,9 @@ class PollVoteView(discord.ui.View):
             high = max(counts) if counts else 0
             winners = [self.choices[i] for i, count in enumerate(counts) if count == high]
             result = "Vote result: " + ", ".join(winners) + " (" + str(high) + " votes)."
-        await self.channel.send("Poll closed. " + result)
+        if self.message:
+            await self.message.edit(view=self)
+            await self.message.reply("Poll closed. " + result)
 
 
 class GiveawayModal(discord.ui.Modal, title="Create a giveaway"):
