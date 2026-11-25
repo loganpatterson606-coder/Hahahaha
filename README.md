@@ -39,3 +39,14 @@ Use Python 3.10+, install with `pip install -r requirements.txt`, set the enviro
 - `!prankpollpreview` creates a clearly labelled simulation only; it does not change real poll totals.
 - XP, coins, warnings, and poll lookup data are in memory and reset when the worker restarts.
 - Use `!help` in Discord to see the available commands.
+
+## Per-server customisation
+
+Server members with **Manage Server** can customise every built-in fun-response category (including `brainrot`, `fakeerror`, jokes, roasts, memes, NPC lines, and more):
+
+- `/addresponse category response` — add another possible response.
+- `/setresponse category response` — replace that category's custom responses with one response.
+- `/resetresponse category` — remove custom responses and return to the defaults.
+- `/settings` — list categories and show which ones have custom responses.
+
+Category names are shown by `/settings`. Custom responses are stored in a local SQLite database. On Render, attach a persistent disk and set `BOT_DATABASE` to a path on that disk if you want settings to survive redeploys; otherwise the platform may discard the database during a new deploy.
