@@ -205,7 +205,7 @@ async def settings(ctx):
     await say(ctx, "**HAHAHA BOT customisation**\n"
                    + ("\n".join(lines) if lines else "No custom responses yet.")
                    + f"\n\n**Available categories:** {categories}"
-                   + "\nUse /customize category to open a pop-up form. Requires Manage Server.")
+                   + "\nUse /customizer to open the interactive customisation menu. Requires Manage Server.")
 
 
 class ResponseConfigModal(discord.ui.Modal):
@@ -271,6 +271,74 @@ async def customize(ctx, category: str):
 async def fakeprofile(ctx):
     if ctx.interaction is None:
         return await say(ctx, "Use /fakeprofile to open the pop-up form.")
+    await ctx.interaction.response.send_modal(FakeProfileModal())
+
+
+class CustomCategorySelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label=name, value=name, description=f"Edit {name} output")
+            for name in sorted(BITS)[:25]
+        ]
+        super().__init__(placeholder="Choose what you want to customise", min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        if not interaction.user.guild_permissions.manage_guild:
+            return await interaction.response.send_message("Manage Server permission required.", ephemeral=True)
+        await interaction.response.send_modal(ResponseConfigModal(self.values[0]))
+
+
+class CustomizerView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=180)
+        self.add_item(CustomCategorySelect())
+
+
+class RiggedPollModal(discord.ui.Modal, title="Create a rigged poll preview"):
+    question = discord.ui.TextInput(label="Poll question", max_length=180)
+    options = discord.ui.TextInput(label="Options (separate with |)", placeholder="Option A | Option B | Option C", max_length=400)
+    winner = discord.ui.TextInput(label="Preselected winner", max_length=80)
+    vote_count = discord.ui.TextInput(label="Fake vote count", placeholder="e.g. 250", max_length=6)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        choices = [item.strip() for item in str(self.options.value).split("|") if item.strip()]
+        chosen = str(self.winner.value).strip()
+        try:
+            count = int(str(self.vote_count.value))
+        except ValueError:
+            return await interaction.response.send_message("Vote count must be a number.", ephemeral=True)
+        if len(choices) < 2 or len(choices) > 8 or chosen not in choices or not 1 <= count <= 100000:
+            return await interaction.response.send_message(
+                "Use 2–8 options, choose a winner exactly as written, and enter 1–100000 simulated votes.",
+                ephemeral=True
+            )
+        embed = discord.Embed(title="RIGGED POLL — SIMULATION", description=str(self.question.value), color=discord.Color.dark_grey())
+        for option in choices:
+            value = f"{count:,} simulated votes" if option == chosen else "0 simulated votes"
+            embed.add_field(name=option, value=value, inline=False)
+        embed.set_footer(text="Fictional preview only. No real votes, reactions, or poll results were changed.")
+        await interaction.response.send_message(embed=embed)
+
+
+@bot.hybrid_command(name="customizer", description="Open the interactive customisation menu")
+@commands.has_permissions(manage_guild=True)
+async def customizer(ctx):
+    if not ctx.guild:
+        return await say(ctx, "Use this inside a server.")
+    await ctx.send("**HAHAHA BOT CUSTOMIZER**\nSelect a command category below to open its edit form.", view=CustomizerView())
+
+
+@bot.hybrid_command(name="riggedpoll", description="Create a clearly labelled rigged poll simulation")
+async def riggedpoll(ctx):
+    if ctx.interaction is None:
+        return await say(ctx, "Use /riggedpoll to open the poll builder.")
+    await ctx.interaction.response.send_modal(RiggedPollModal())
+
+
+@bot.hybrid_command(name="faker", description="Open a fake member/status profile builder")
+async def faker(ctx):
+    if ctx.interaction is None:
+        return await say(ctx, "Use /faker to open the profile builder.")
     await ctx.interaction.response.send_modal(FakeProfileModal())
 
 @bot.hybrid_command()
