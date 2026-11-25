@@ -498,12 +498,15 @@ class SpotifyModal(discord.ui.Modal, title="Search Spotify"):
             if not tracks:
                 return await interaction.response.send_message("No tracks found.", ephemeral=True)
             embed = discord.Embed(title="Spotify search results")
-            for track in tracks:
+            links = discord.ui.View(timeout=180)
+            for index, track in enumerate(tracks):
                 artists = ", ".join(a["name"] for a in track.get("artists", []))
                 url = track.get("external_urls", {}).get("spotify", "")
-                embed.add_field(name=(track["name"] + " — " + artists)[:256], value="[Open in Spotify](" + url + ")", inline=False)
+                embed.add_field(name=(track["name"] + " — " + artists)[:256], value="Result " + str(index + 1), inline=False)
+                if url:
+                    links.add_item(discord.ui.Button(label="Open " + str(index + 1) + " in Spotify", style=discord.ButtonStyle.link, url=url))
             embed.set_footer(text="Spotify search/link only; the Web API does not stream audio to Discord.")
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.response.send_message(embed=embed, view=links, ephemeral=True)
         except Exception as exc:
             print("Spotify error:", type(exc).__name__, str(exc))
             await interaction.response.send_message("Spotify search unavailable.", ephemeral=True)
