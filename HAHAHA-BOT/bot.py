@@ -170,17 +170,17 @@ async def pollresult(ctx, message_id:int):
     for i,o in enumerate(p["options"]):
         r=discord.utils.get(msg.reactions,emoji=es[i]); result.append(f"{o}: {max(0,r.count-1) if r else 0}")
     await say(ctx,"Actual votes\n"+"\n".join(result))
-@bot.command()
+@bot.command(hidden=True)
 @owner_only()
 async def prankpollpreview(ctx, message_id:int, option_number:int, fake_votes:int=100):
     p=polls.get(message_id)
     if not p or not 1<=option_number<=len(p["options"]) or not 1<=fake_votes<=10000:
         return await say(ctx,"Invalid poll, option, or preview count.")
     await say(ctx,f"SIMULATED PRANK PREVIEW — NOT REAL VOTES\n{p['options'][option_number-1]}: {fake_votes} imaginary votes. Actual totals unchanged.")
-@bot.command()
+@bot.command(hidden=True)
 @owner_only()
 async def ownerpanel(ctx): await say(ctx,f"Owner panel for {OWNER_ID}: prankpollpreview, shutdown")
-@bot.command()
+@bot.command(hidden=True)
 @owner_only()
 async def shutdown(ctx):
     await say(ctx,"Bot shutting down."); await bot.close()
