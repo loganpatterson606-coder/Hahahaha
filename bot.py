@@ -255,5 +255,64 @@ for alias,target in ALIASES.items():
         await bot.get_command(_target).callback(ctx)
     bot.command(name=alias)(alias_cmd)
 
+async def handle_http(reader, writer):
+    """Serve the root website and a lightweight Render health endpoint."""
+    try:
+        request = await asyncio.wait_for(reader.readline(), timeout=5)
+        if not request:
+            return
+        parts = request.decode("latin-1").strip().split()
+        method, path = (parts[0], parts[1]) if len(parts) >= 2 else ("", "/")
+        while True:
+            header = await asyncio.wait_for(reader.readline(), timeout=5)
+            if header in (b"\r\n", b"\n", b""):
+                break
+
+        if method not in ("GET", "HEAD"):
+            status, body, content_type = "405 Method Not Allowed", b"Method Not Allowed", "text/plain; charset=utf-8"
+        elif path.split("?", 1)[0] in ("/", "/index.html"):
+            with open(os.path.join(os.path.dirname(__file__), "index.html"), "rb") as page:
+                body = page.read()
+            status, content_type = "200 OK", "text/html; charset=utf-8"
+        elif path.split("?", 1)[0] == "/health":
+            body = b"HAHAHA BOT is running"
+            status, content_type = "200 OK", "text/plain; charset=utf-8"
+        else:
+            body = b"Not Found"
+            status, content_type = "404 Not Found", "text/plain; charset=utf-8"
+
+        headers = (
+            f"HTTP/1.1 {status}\r\n"
+            f"Content-Type: {content_type}\r\n"
+            f"Content-Length: {len(body)}\r\n"
+            "Connection: close\r\n"
+            "Cache-Control: no-store\r\n\r\n"
+        ).encode("ascii")
+        writer.write(headers)
+        if method != "HEAD":
+            writer.write(body)
+        await writer.drain()
+    except (asyncio.TimeoutError, ConnectionError, BrokenPipeError):
+        pass
+    finally:
+        writer.close()
+        try:
+            await writer.wait_closed()
+        except ConnectionError:
+            pass
+
+
+async def main():
+    port = int(os.getenv("PORT", "10000"))
+    server = await asyncio.start_server(handle_http, "0.0.0.0", port)
+    print(f"HAHAHA BOT website listening on port {port}")
+    try:
+        async with server:
+            await bot.start(TOKEN)
+    finally:
+        if not bot.is_closed():
+            await bot.close()
+
+
 if __name__ == "__main__":
-    bot.run(TOKEN)
+    asyncio.run(main())
