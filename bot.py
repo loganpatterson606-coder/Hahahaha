@@ -341,6 +341,181 @@ async def faker(ctx):
         return await say(ctx, "Use /faker to open the profile builder.")
     await ctx.interaction.response.send_modal(FakeProfileModal())
 
+
+class PollBuilderModal(discord.ui.Modal, title="Create a poll"):
+    question = discord.ui.TextInput(label="Question", max_length=180)
+    options = discord.ui.TextInput(label="Options separated by |", max_length=400)
+    duration = discord.ui.TextInput(label="Duration in minutes", max_length=5)
+    mode = discord.ui.TextInput(label="Mode: random or selected", max_length=10)
+    member_id = discord.ui.TextInput(label="Selected member ID", required=False, max_length=25)
+
+    async def on_submit(self, interaction):
+        choices = [v.strip() for v in str(self.options.value).split("|") if v.strip()]
+        try:
+            minutes = int(str(self.duration.value))
+        except ValueError:
+            return await interaction.response.send_message("Duration must be a number.", ephemeral=True)
+        mode = str(self.mode.value).strip().lower()
+        if not 2 <= len(choices) <= 5 or not 1 <= minutes <= 10080 or mode not in ("random", "selected"):
+            return await interaction.response.send_message("Invalid options, duration, or mode.", ephemeral=True)
+        target = None
+        if mode == "selected":
+            try:
+                target = interaction.guild.get_member(int(str(self.member_id.value)))
+            except (ValueError, TypeError):
+                target = None
+            if target is None:
+                return await interaction.response.send_message("Enter a valid member ID.", ephemeral=True)
+        view = PollVoteView(choices, minutes * 60, target, interaction.channel)
+        embed = discord.Embed(title="POLL: " + str(self.question.value), description="\n".join(choices))
+        embed.add_field(name="Outcome", value="Vote-counted" if target is None else "ADMIN-SELECTED: " + target.mention)
+        embed.set_footer(text="Admin-selected outcome is disclosed; this is not a democratic result." if target else "One vote per member.")
+        await interaction.response.send_message("Poll posted.", ephemeral=True)
+        await interaction.channel.send(embed=embed, view=view)
+
+
+class PollVoteView(discord.ui.View):
+    def __init__(self, choices, duration, target, channel):
+        super().__init__(timeout=duration)
+        self.choices, self.target, self.channel, self.votes = choices, target, channel, {}
+        for i, choice in enumerate(choices):
+            button = discord.ui.Button(label=choice[:80], style=discord.ButtonStyle.primary)
+            button.callback = self.callback_for(i)
+            self.add_item(button)
+
+    def callback_for(self, index):
+        async def vote(interaction):
+            self.votes[interaction.user.id] = index
+            await interaction.response.send_message("Vote saved.", ephemeral=True)
+        return vote
+
+    async def on_timeout(self):
+        for child in self.children:
+            child.disabled = True
+        if self.target:
+            result = "ADMIN-SELECTED OUTCOME: " + self.target.mention + " (not vote-counted)."
+        else:
+            counts = [list(self.votes.values()).count(i) for i in range(len(self.choices))]
+            high = max(counts) if counts else 0
+            winners = [self.choices[i] for i, count in enumerate(counts) if count == high]
+            result = "Vote result: " + ", ".join(winners) + " (" + str(high) + " votes)."
+        await self.channel.send("Poll closed. " + result)
+
+
+class GiveawayModal(discord.ui.Modal, title="Create a giveaway"):
+    prize = discord.ui.TextInput(label="Prize", max_length=100)
+    duration = discord.ui.TextInput(label="Duration in minutes", max_length=5)
+    mode = discord.ui.TextInput(label="Mode: random or selected", max_length=10)
+    member_id = discord.ui.TextInput(label="Selected winner ID", required=False, max_length=25)
+
+    async def on_submit(self, interaction):
+        try:
+            minutes = int(str(self.duration.value))
+        except ValueError:
+            return await interaction.response.send_message("Duration must be a number.", ephemeral=True)
+        mode = str(self.mode.value).strip().lower()
+        if not 1 <= minutes <= 10080 or mode not in ("random", "selected"):
+            return await interaction.response.send_message("Invalid duration or mode.", ephemeral=True)
+        target = None
+        if mode == "selected":
+            try:
+                target = interaction.guild.get_member(int(str(self.member_id.value)))
+            except (ValueError, TypeError):
+                target = None
+            if target is None:
+                return await interaction.response.send_message("Enter a valid member ID.", ephemeral=True)
+        view = GiveawayView(minutes * 60, target)
+        embed = discord.Embed(title="GIVEAWAY: " + str(self.prize.value), description="Press Enter to join.")
+        embed.add_field(name="Winner selection", value="Random entrant" if target is None else "ADMIN-SELECTED: " + target.mention)
+        embed.set_footer(text="Admin-selected winner is disclosed; this is not a random draw." if target else "Winner selected randomly from entrants.")
+        await interaction.response.send_message("Giveaway posted.", ephemeral=True)
+        view.message = await interaction.channel.send(embed=embed, view=view)
+        asyncio.create_task(view.finish())
+
+
+class GiveawayView(discord.ui.View):
+    def __init__(self, duration, target):
+        super().__init__(timeout=None)
+        self.duration, self.target, self.entries, self.message = duration, target, set(), None
+        button = discord.ui.Button(label="Enter giveaway", style=discord.ButtonStyle.success, custom_id="giveaway_join_" + str(random.randint(1, 99999999)))
+        button.callback = self.enter
+        self.add_item(button)
+
+    async def enter(self, interaction):
+        self.entries.add(interaction.user.id)
+        await interaction.response.send_message("Entry saved.", ephemeral=True)
+
+    async def finish(self):
+        await asyncio.sleep(self.duration)
+        for child in self.children:
+            child.disabled = True
+        if self.target:
+            result = "ADMIN-SELECTED WINNER: " + self.target.mention + " (not a random draw)."
+        elif self.entries:
+            result = "Random winner: <@" + str(random.choice(list(self.entries))) + ">"
+        else:
+            result = "No entries."
+        if self.message:
+            await self.message.edit(view=self)
+            await self.message.reply("Giveaway closed. " + result)
+
+
+class SpotifyModal(discord.ui.Modal, title="Search Spotify"):
+    query = discord.ui.TextInput(label="Song or artist", max_length=100)
+
+    async def on_submit(self, interaction):
+        client_id, secret = os.getenv("SPOTIFY_CLIENT_ID"), os.getenv("SPOTIFY_CLIENT_SECRET")
+        if not client_id or not secret:
+            return await interaction.response.send_message("Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in Render.", ephemeral=True)
+        try:
+            import aiohttp
+            async with aiohttp.ClientSession(auth=aiohttp.BasicAuth(client_id, secret)) as session:
+                async with session.post("https://accounts.spotify.com/api/token", data={"grant_type": "client_credentials"}) as response:
+                    if response.status != 200:
+                        return await interaction.response.send_message("Spotify authentication failed.", ephemeral=True)
+                    token = (await response.json())["access_token"]
+                async with session.get("https://api.spotify.com/v1/search", headers={"Authorization": "Bearer " + token}, params={"q": str(self.query.value), "type": "track", "limit": 5}) as response:
+                    if response.status != 200:
+                        return await interaction.response.send_message("Spotify search failed.", ephemeral=True)
+                    data = await response.json()
+            tracks = data.get("tracks", {}).get("items", [])
+            if not tracks:
+                return await interaction.response.send_message("No tracks found.", ephemeral=True)
+            embed = discord.Embed(title="Spotify search results")
+            for track in tracks:
+                artists = ", ".join(a["name"] for a in track.get("artists", []))
+                url = track.get("external_urls", {}).get("spotify", "")
+                embed.add_field(name=(track["name"] + " — " + artists)[:256], value="[Open in Spotify](" + url + ")", inline=False)
+            embed.set_footer(text="Spotify search/link only; the Web API does not stream audio to Discord.")
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+        except Exception as exc:
+            print("Spotify error:", type(exc).__name__, str(exc))
+            await interaction.response.send_message("Spotify search unavailable.", ephemeral=True)
+
+
+@bot.hybrid_command(name="pollbuilder")
+@commands.has_permissions(manage_guild=True)
+async def pollbuilder(ctx):
+    if ctx.interaction is None:
+        return await say(ctx, "Use slash command /pollbuilder.")
+    await ctx.interaction.response.send_modal(PollBuilderModal())
+
+
+@bot.hybrid_command(name="giveaway")
+@commands.has_permissions(manage_guild=True)
+async def giveaway(ctx):
+    if ctx.interaction is None:
+        return await say(ctx, "Use slash command /giveaway.")
+    await ctx.interaction.response.send_modal(GiveawayModal())
+
+
+@bot.hybrid_command(name="song")
+async def song(ctx):
+    if ctx.interaction is None:
+        return await say(ctx, "Use slash command /song.")
+    await ctx.interaction.response.send_modal(SpotifyModal())
+
+
 @bot.hybrid_command()
 async def guess(ctx, number:int):
     if not 1<=number<=10: return await say(ctx,"Pick 1–10.")
