@@ -104,17 +104,10 @@ async def dice(ctx, sides:int=6):
     await say(ctx, f"🎲 {random.randint(1,sides)}")
 
 BITS = {
-"joke":["Why did the scarecrow win? Outstanding in his field.","I told my PC a joke. It crashed laughing.","Parallel lines have so much in common."],
 "fact":["Octopuses have three hearts.","Bananas are berries; strawberries aren't.","A day on Venus is longer than its year."],
-"quote":["Stay curious. Stay chaotic.","Be yourself; everyone else is taken."],
 "roast":["Your Wi-Fi has more connection than your jokes.","You're proof autocorrect can't fix everything.","You bring joy… especially when you leave."],
-"compliment":["Your vibe is immaculate.","You make the group chat better.","Your brain has premium DLC."],
-"pickup":["Are you Wi-Fi? I feel a connection.","Are you a keyboard? You're just my type."],
-"motivate":["One step at a time. You've got this.","Progress beats perfection."],
-"fortune":["A surprise W is approaching.","Avoid arguing with a toaster today."],
 "riddle":["What has keys but no locks? A piano.","What gets wetter as it dries? A towel."],
 "meme":["Me opening the fridge for the ninth time: new update?","When the teacher says pair up and you become a group of one."],
-"dadjoke":["I'm reading a book about anti-gravity. Impossible to put down.","I only know 25 letters. I don't know y."],
 "truth":["What's a tiny thing that improves your day?","What's your most irrational fear?"],
 "dare":["Send a message using only emojis.","Talk like a pirate for three messages."],
 "vibe":["chaotic good ✨","sleepy legend 😴","main character energy 🎬"],
@@ -133,13 +126,10 @@ BITS = {
 "fakeerror":["ERROR 418: I'm a teapot.","404: Motivation not found."],
 "typing":["*is typing…*","typing faster than the speed of light"],
 "dramatic":["THIS IS THE MOST IMPORTANT MOMENT IN SERVER HISTORY.","Cue dramatic music 🎻"],
-"sleep":["Go hydrate and get some rest 😴","Your pillow misses you."],
-"coffee":["☕ One cup of motivation.","Espresso yourself."],
-"mathjoke":["Why was 6 afraid of 7? Because 7 8 9."],
 "wouldyourather":["Fight one horse-sized duck or 100 duck-sized horses?","Unlimited pizza or unlimited tacos?"],
 "neverhaveiever":["Never have I ever waved back at someone who wasn't waving.","Never forgotten why I entered a room."],
 "rate":["10/10 iconic","7/10 mildly suspicious","100/10 certified legend"],
-"insult":["You absolute soggy biscuit.","You malfunctioning toaster."],
+"insult":["That was certainly a decision.","Please update your argument and try again."],
 "ship":["You two have 99% meme compatibility 💞"],
 }
 def make_generated_command(lines):
@@ -215,7 +205,73 @@ async def settings(ctx):
     await say(ctx, "**HAHAHA BOT customisation**\n"
                    + ("\n".join(lines) if lines else "No custom responses yet.")
                    + f"\n\n**Available categories:** {categories}"
-                   + "\nUse /addresponse, /setresponse, or /resetresponse. Requires Manage Server.")
+                   + "\nUse /customize category to open a pop-up form. Requires Manage Server.")
+
+
+class ResponseConfigModal(discord.ui.Modal):
+    def __init__(self, category: str):
+        super().__init__(title=f"Customize: {category}"[:45], timeout=300)
+        self.category = category
+        self.response = discord.ui.TextInput(
+            label="Custom response",
+            placeholder="Enter the text the bot should use...",
+            style=discord.TextStyle.paragraph,
+            max_length=1000,
+            required=True
+        )
+        self.add_item(self.response)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if interaction.guild_id is None:
+            return await interaction.response.send_message("Use this inside a server.", ephemeral=True)
+        value = str(self.response.value).strip()
+        db.execute(
+            "INSERT OR IGNORE INTO custom_responses (guild_id, category, response) VALUES (?, ?, ?)",
+            (interaction.guild_id, self.category, value)
+        )
+        db.commit()
+        await interaction.response.send_message(
+            f"Saved a custom {self.category} response for this server.",
+            ephemeral=True
+        )
+
+
+class FakeProfileModal(discord.ui.Modal, title="Build a simulated member card"):
+    display_name = discord.ui.TextInput(label="Display name", placeholder="e.g. ghost.exe", max_length=32)
+    status = discord.ui.TextInput(label="Status", placeholder="online / idle / dnd / offline", max_length=20)
+    activity = discord.ui.TextInput(label="Activity", placeholder="e.g. Playing ranked", max_length=80, required=False)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        allowed = {"online": "🟢 Online", "idle": "🌙 Idle", "dnd": "⛔ Do Not Disturb", "offline": "⚫ Offline"}
+        state = str(self.status.value).strip().lower()
+        if state not in allowed:
+            return await interaction.response.send_message("Status must be online, idle, dnd, or offline.", ephemeral=True)
+        embed = discord.Embed(title="SIMULATED MEMBER PREVIEW", color=discord.Color.dark_grey())
+        embed.add_field(name="Display name", value=str(self.display_name.value), inline=True)
+        embed.add_field(name="Status (fictional)", value=allowed[state], inline=True)
+        embed.add_field(name="Activity (fictional)", value=str(self.activity.value).strip() or "None", inline=False)
+        embed.set_footer(text="Preview only — does not create an account or change real member presence.")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@bot.hybrid_command(name="customize", description="Open a pop-up form to customise a bot response")
+@commands.has_permissions(manage_guild=True)
+async def customize(ctx, category: str):
+    category = category.strip().lower()
+    if not ctx.guild:
+        return await say(ctx, "Use this inside a server.")
+    if category not in BITS:
+        return await say(ctx, "Unknown category. Run /settings to see available categories.")
+    if ctx.interaction is None:
+        return await say(ctx, "Use the slash command /customize to open the pop-up form.")
+    await ctx.interaction.response.send_modal(ResponseConfigModal(category))
+
+
+@bot.hybrid_command(name="fakeprofile", description="Create a clearly labelled simulated member/status preview")
+async def fakeprofile(ctx):
+    if ctx.interaction is None:
+        return await say(ctx, "Use /fakeprofile to open the pop-up form.")
+    await ctx.interaction.response.send_modal(FakeProfileModal())
 
 @bot.hybrid_command()
 async def guess(ctx, number:int):
