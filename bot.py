@@ -121,10 +121,13 @@ BITS = {
 "insult":["You absolute soggy biscuit.","You malfunctioning toaster."],
 "ship":["You two have 99% meme compatibility 💞"],
 }
+def make_generated_command(lines):
+    async def generated(ctx):
+        await say(ctx, random.choice(lines))
+    return generated
+
 for name, lines in BITS.items():
-    async def generated(ctx, _lines=lines):
-        await say(ctx, random.choice(_lines))
-    bot.hybrid_command(name=name)(generated)
+    bot.hybrid_command(name=name)(make_generated_command(lines))
 
 @bot.hybrid_command()
 async def guess(ctx, number:int):
