@@ -377,9 +377,11 @@ class PollBuilderModal(discord.ui.Modal, title="Create a poll"):
                 target = None
             if target is None:
                 return await interaction.response.send_message("Enter a valid member ID.", ephemeral=True)
+            if target.display_name.casefold() not in [choice.casefold() for choice in choices]:
+                return await interaction.response.send_message("In selected mode, include the selected member's server display name as one of the poll options.", ephemeral=True)
         view = PollVoteView(choices, minutes * 60, target, interaction.channel)
         embed = discord.Embed(title="POLL: " + str(self.question.value), description="\n".join(choices))
-        embed.add_field(name="Outcome", value="Vote-counted" if target is None else "ADMIN-SELECTED: " + target.mention)
+        embed.add_field(name="Outcome", value="Vote-counted" if target is None else "ADMIN-SELECTED OPTION: " + target.display_name + " (" + target.mention + ")")
         embed.set_footer(text="Admin-selected outcome is disclosed; this is not a democratic result." if target else "One vote per member.")
         await interaction.response.send_message("Poll posted.", ephemeral=True)
         view.message = await interaction.channel.send(embed=embed, view=view)
@@ -405,7 +407,7 @@ class PollVoteView(discord.ui.View):
         for child in self.children:
             child.disabled = True
         if self.target:
-            result = "ADMIN-SELECTED OUTCOME: " + self.target.mention + " (not vote-counted)."
+            result = "ADMIN-SELECTED OUTCOME: " + self.target.display_name + " (" + self.target.mention + "). This was not vote-counted."
         else:
             counts = [list(self.votes.values()).count(i) for i in range(len(self.choices))]
             high = max(counts) if counts else 0
