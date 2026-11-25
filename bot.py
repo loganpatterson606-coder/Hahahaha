@@ -408,6 +408,8 @@ async def countdown(ctx, seconds:int):
 
 ALIASES={"haha":"joke","lol":"joke","lmao":"joke","roastme":"roast","hype":"compliment","magic8":"fortune","vibecheck":"vibe","randomemoji":"emoji","randomcolor":"color","randomsnack":"snack","randomanimal":"animal","randommovie":"movie","randomsong":"song","dailychallenge":"challenge","yeet":"dramatic","bruh":"brainrot","skillissue":"roast","wholesome":"compliment","dad_joke":"dadjoke","fakecrash":"fakeerror","error":"fakeerror","coin":"coinflip","flip":"coinflip","8ball":"fortune","jokeplease":"joke","factplease":"fact","quoteplease":"quote","moodcheck":"mood","sleepy":"sleep","coffeeplease":"coffee","clap":"clapback","randomnumber":"roll","riddleme":"riddle","server":"serverinfo","whois":"userinfo","pfp":"avatar","commands":"help","roastbattle":"roast","goodvibes":"compliment","badvibes":"insult","fortune_cookie":"fortune","randomfact":"fact","randomquote":"quote","randomriddle":"riddle","randomjoke":"joke","randomrate":"rate","shipname":"ship","memeplease":"meme","npcmode":"npc","truthplease":"truth","dareplease":"dare","randomchallenge":"challenge"}
 for alias,target in ALIASES.items():
+    if bot.get_command(target) is None:
+        continue
     async def alias_cmd(ctx, _target=target):
         await bot.get_command(_target).callback(ctx)
     bot.command(name=alias)(alias_cmd)
