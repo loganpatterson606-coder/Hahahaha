@@ -212,10 +212,10 @@ async def settings(ctx):
     ).fetchall()
     lines = [f"{category}: {count} custom response(s)" for category, count in rows]
     categories = ", ".join(sorted(BITS))
-    await say(ctx, "**HAHAHA BOT customisation**\\n"
-                   + ("\\n".join(lines) if lines else "No custom responses yet.")
-                   + f"\\n\\n**Available categories:** {categories}"
-                   + "\\nUse /addresponse, /setresponse, or /resetresponse. Requires Manage Server.")
+    await say(ctx, "**HAHAHA BOT customisation**\n"
+                   + ("\n".join(lines) if lines else "No custom responses yet.")
+                   + f"\n\n**Available categories:** {categories}"
+                   + "\nUse /addresponse, /setresponse, or /resetresponse. Requires Manage Server.")
 
 @bot.hybrid_command()
 async def guess(ctx, number:int):
