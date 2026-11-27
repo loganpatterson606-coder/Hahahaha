@@ -133,16 +133,13 @@ BITS = {
 "ship":["You two have 99% meme compatibility 💞"],
 }
 def make_generated_command(lines, category):
-    async def generated(ctx, customize: bool = False):
-        if customize:
-            if not ctx.guild:
-                return await say(ctx, "Use this inside a server.")
-            if not ctx.author.guild_permissions.manage_guild:
-                return await say(ctx, "Manage Server permission required to customise commands.")
-            if ctx.interaction is None:
-                return await say(ctx, "Use the slash command and set customize to True.")
-            return await ctx.interaction.response.send_modal(ResponseConfigModal(category))
-        await say(ctx, random.choice(response_pool(ctx, category, lines)))
+    async def generated(ctx):
+        # Each command has its own configuration button on its response.
+        await ctx.reply(
+            random.choice(response_pool(ctx, category, lines)),
+            mention_author=False,
+            view=ResponseConfigView(category)
+        )
     return generated
 
 for name, lines in BITS.items():
@@ -152,20 +149,18 @@ for name, lines in BITS.items():
     callback.__name__ = command_name
     bot.hybrid_command(name=command_name)(callback)
 
-@bot.hybrid_command(name="settings", description="Show this server's fun-command customisations")
-async def settings(ctx):
-    if not ctx.guild:
-        return await say(ctx, "Use this command inside a server.")
-    rows = db.execute(
-        "SELECT category, COUNT(*) FROM custom_responses WHERE guild_id=? GROUP BY category ORDER BY category",
-        (ctx.guild.id,)
-    ).fetchall()
-    lines = [f"{category}: {count} custom response(s)" for category, count in rows]
-    categories = ", ".join(sorted(BITS))
-    await say(ctx, "**HAHAHA BOT customisation**\n"
-                   + ("\n".join(lines) if lines else "No custom responses yet.")
-                   + f"\n\n**Available categories:** {categories}"
-                   + "\nTo customise a fun command, run its slash command and set customize to True. Requires Manage Server.")
+class ResponseConfigView(discord.ui.View):
+    def __init__(self, category: str):
+        super().__init__(timeout=300)
+        self.category = category
+
+    @discord.ui.button(label="Customize this command", style=discord.ButtonStyle.secondary)
+    async def customize_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.guild is None:
+            return await interaction.response.send_message("Use this inside a server.", ephemeral=True)
+        if not interaction.user.guild_permissions.manage_guild:
+            return await interaction.response.send_message("Manage Server permission required.", ephemeral=True)
+        await interaction.response.send_modal(ResponseConfigModal(self.category))
 
 
 class ResponseConfigModal(discord.ui.Modal):
