@@ -133,7 +133,15 @@ BITS = {
 "ship":["You two have 99% meme compatibility 💞"],
 }
 def make_generated_command(lines, category):
-    async def generated(ctx):
+    async def generated(ctx, customize: bool = False):
+        if customize:
+            if not ctx.guild:
+                return await say(ctx, "Use this inside a server.")
+            if not ctx.author.guild_permissions.manage_guild:
+                return await say(ctx, "Manage Server permission required to customise commands.")
+            if ctx.interaction is None:
+                return await say(ctx, "Use the slash command and set customize to True.")
+            return await ctx.interaction.response.send_modal(ResponseConfigModal(category))
         await say(ctx, random.choice(response_pool(ctx, category, lines)))
     return generated
 
@@ -143,55 +151,6 @@ for name, lines in BITS.items():
     callback = make_generated_command(lines, name)
     callback.__name__ = command_name
     bot.hybrid_command(name=command_name)(callback)
-
-@bot.hybrid_command(name="addresponse", description="Add a custom response to any fun command")
-@commands.has_permissions(manage_guild=True)
-async def addresponse(ctx, category: str, *, response: str):
-    category = category.lower().strip()
-    if not ctx.guild:
-        return await say(ctx, "Use this command inside a server.")
-    if category not in BITS:
-        return await say(ctx, "Unknown category. Use /settings to see every customisable category.")
-    response = response.strip()
-    if not response or len(response) > 1800:
-        return await say(ctx, "Response must be between 1 and 1800 characters.")
-    db.execute(
-        "INSERT OR IGNORE INTO custom_responses (guild_id, category, response) VALUES (?, ?, ?)",
-        (ctx.guild.id, category, response)
-    )
-    db.commit()
-    await say(ctx, f"Added a custom {category} response for this server.")
-
-@bot.hybrid_command(name="setresponse", description="Replace custom responses for a fun command")
-@commands.has_permissions(manage_guild=True)
-async def setresponse(ctx, category: str, *, response: str):
-    category = category.lower().strip()
-    if not ctx.guild:
-        return await say(ctx, "Use this command inside a server.")
-    if category not in BITS:
-        return await say(ctx, "Unknown category. Use /settings to see every customisable category.")
-    response = response.strip()
-    if not response or len(response) > 1800:
-        return await say(ctx, "Response must be between 1 and 1800 characters.")
-    db.execute("DELETE FROM custom_responses WHERE guild_id=? AND category=?", (ctx.guild.id, category))
-    db.execute(
-        "INSERT INTO custom_responses (guild_id, category, response) VALUES (?, ?, ?)",
-        (ctx.guild.id, category, response)
-    )
-    db.commit()
-    await say(ctx, f"Replaced this server's custom {category} responses.")
-
-@bot.hybrid_command(name="resetresponse", description="Remove custom responses for a fun command")
-@commands.has_permissions(manage_guild=True)
-async def resetresponse(ctx, category: str):
-    category = category.lower().strip()
-    if not ctx.guild:
-        return await say(ctx, "Use this command inside a server.")
-    if category not in BITS:
-        return await say(ctx, "Unknown category. Use /settings to see every customisable category.")
-    db.execute("DELETE FROM custom_responses WHERE guild_id=? AND category=?", (ctx.guild.id, category))
-    db.commit()
-    await say(ctx, f"Reset {category} to the built-in responses.")
 
 @bot.hybrid_command(name="settings", description="Show this server's fun-command customisations")
 async def settings(ctx):
@@ -206,7 +165,7 @@ async def settings(ctx):
     await say(ctx, "**HAHAHA BOT customisation**\n"
                    + ("\n".join(lines) if lines else "No custom responses yet.")
                    + f"\n\n**Available categories:** {categories}"
-                   + "\nUse /customizer to open the interactive customisation menu. Requires Manage Server.")
+                   + "\nTo customise a fun command, run its slash command and set customize to True. Requires Manage Server.")
 
 
 class ResponseConfigModal(discord.ui.Modal):
@@ -255,55 +214,11 @@ class FakeProfileModal(discord.ui.Modal, title="Build a simulated member card"):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
-@bot.hybrid_command(name="customize", description="Open a pop-up form to customise a bot response")
-@commands.has_permissions(manage_guild=True)
-async def customize(ctx, category: str):
-    category = category.strip().lower()
-    if not ctx.guild:
-        return await say(ctx, "Use this inside a server.")
-    if category not in BITS:
-        return await say(ctx, "Unknown category. Run /settings to see available categories.")
-    if ctx.interaction is None:
-        return await say(ctx, "Use the slash command /customize to open the pop-up form.")
-    await ctx.interaction.response.send_modal(ResponseConfigModal(category))
-
-
 @bot.hybrid_command(name="fakeprofile", description="Create a clearly labelled simulated member/status preview")
 async def fakeprofile(ctx):
     if ctx.interaction is None:
         return await say(ctx, "Use /fakeprofile to open the pop-up form.")
     await ctx.interaction.response.send_modal(FakeProfileModal())
-
-
-class CustomCategorySelect(discord.ui.Select):
-    def __init__(self):
-        options = [
-            discord.SelectOption(label=name, value=name, description=f"Edit {name} output")
-            for name in sorted(BITS)[:22]
-        ] + [
-            discord.SelectOption(label="Poll builder", value="__poll__", description="Configure a poll"),
-            discord.SelectOption(label="Giveaway builder", value="__giveaway__", description="Configure a giveaway"),
-            discord.SelectOption(label="Spotify search", value="__song__", description="Search Spotify")
-        ]
-        super().__init__(placeholder="Choose what you want to customise", min_values=1, max_values=1, options=options)
-
-    async def callback(self, interaction: discord.Interaction):
-        if not interaction.user.guild_permissions.manage_guild:
-            return await interaction.response.send_message("Manage Server permission required.", ephemeral=True)
-        selected = self.values[0]
-        if selected == "__poll__":
-            return await interaction.response.send_modal(PollBuilderModal())
-        if selected == "__giveaway__":
-            return await interaction.response.send_modal(GiveawayModal())
-        if selected == "__song__":
-            return await interaction.response.send_modal(SpotifyModal())
-        await interaction.response.send_modal(ResponseConfigModal(selected))
-
-
-class CustomizerView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=180)
-        self.add_item(CustomCategorySelect())
 
 
 class RiggedPollModal(discord.ui.Modal, title="Create a rigged poll preview"):
@@ -330,14 +245,6 @@ class RiggedPollModal(discord.ui.Modal, title="Create a rigged poll preview"):
             embed.add_field(name=option, value=value, inline=False)
         embed.set_footer(text="Fictional preview only. No real votes, reactions, or poll results were changed.")
         await interaction.response.send_message(embed=embed)
-
-
-@bot.hybrid_command(name="customizer", description="Open the interactive customisation menu")
-@commands.has_permissions(manage_guild=True)
-async def customizer(ctx):
-    if not ctx.guild:
-        return await say(ctx, "Use this inside a server.")
-    await ctx.send("**HAHAHA BOT CUSTOMIZER**\nSelect a command category below to open its edit form.", view=CustomizerView())
 
 
 @bot.hybrid_command(name="riggedpoll", description="Create a clearly labelled rigged poll simulation")
@@ -513,14 +420,6 @@ class SpotifyModal(discord.ui.Modal, title="Search Spotify"):
             await interaction.response.send_message("Spotify search unavailable.", ephemeral=True)
 
 
-@bot.hybrid_command(name="pollbuilder")
-@commands.has_permissions(manage_guild=True)
-async def pollbuilder(ctx):
-    if ctx.interaction is None:
-        return await say(ctx, "Use slash command /pollbuilder.")
-    await ctx.interaction.response.send_modal(PollBuilderModal())
-
-
 @bot.hybrid_command(name="giveaway")
 @commands.has_permissions(manage_guild=True)
 async def giveaway(ctx):
@@ -573,7 +472,12 @@ async def trivia(ctx):
     await say(ctx,f"{q} ||{a}||")
 
 @bot.hybrid_command()
-async def poll(ctx, *, prompt):
+@commands.has_permissions(manage_guild=True)
+async def poll(ctx, *, prompt: str = None):
+    if ctx.interaction is not None and prompt is None:
+        return await ctx.interaction.response.send_modal(PollBuilderModal())
+    if prompt is None:
+        return await say(ctx, f"Use {PREFIX}poll Question | Option A | Option B.")
     parts=[p.strip() for p in prompt.split("|") if p.strip()]
     if not 3<=len(parts)<=11: return await say(ctx,f"Use {PREFIX}poll Question | Option A | Option B.")
     q,opts=parts[0],parts[1:]
