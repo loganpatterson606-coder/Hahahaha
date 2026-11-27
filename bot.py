@@ -132,16 +132,17 @@ BITS = {
 "insult":["That was certainly a decision.","Please update your argument and try again."],
 "ship":["You two have 99% meme compatibility 💞"],
 }
-def make_generated_command(lines):
+def make_generated_command(lines, category):
     async def generated(ctx):
-        category = generated.__name__
         await say(ctx, random.choice(response_pool(ctx, category, lines)))
     return generated
 
 for name, lines in BITS.items():
-    callback = make_generated_command(lines)
-    callback.__name__ = name
-    bot.hybrid_command(name=name)(callback)
+    # /song is reserved for the Spotify search modal below.
+    command_name = "songidea" if name == "song" else name
+    callback = make_generated_command(lines, name)
+    callback.__name__ = command_name
+    bot.hybrid_command(name=command_name)(callback)
 
 @bot.hybrid_command(name="addresponse", description="Add a custom response to any fun command")
 @commands.has_permissions(manage_guild=True)
@@ -668,7 +669,7 @@ async def countdown(ctx, seconds:int):
         await asyncio.sleep(1); await m.edit(content=str(n))
     await asyncio.sleep(1); await m.edit(content="GO!")
 
-ALIASES={"haha":"joke","lol":"joke","lmao":"joke","roastme":"roast","hype":"compliment","magic8":"fortune","vibecheck":"vibe","randomemoji":"emoji","randomcolor":"color","randomsnack":"snack","randomanimal":"animal","randommovie":"movie","randomsong":"song","dailychallenge":"challenge","yeet":"dramatic","bruh":"brainrot","skillissue":"roast","wholesome":"compliment","dad_joke":"dadjoke","fakecrash":"fakeerror","error":"fakeerror","coin":"coinflip","flip":"coinflip","8ball":"fortune","jokeplease":"joke","factplease":"fact","quoteplease":"quote","moodcheck":"mood","sleepy":"sleep","coffeeplease":"coffee","clap":"clapback","randomnumber":"roll","riddleme":"riddle","server":"serverinfo","whois":"userinfo","pfp":"avatar","commands":"help","roastbattle":"roast","goodvibes":"compliment","badvibes":"insult","fortune_cookie":"fortune","randomfact":"fact","randomquote":"quote","randomriddle":"riddle","randomjoke":"joke","randomrate":"rate","shipname":"ship","memeplease":"meme","npcmode":"npc","truthplease":"truth","dareplease":"dare","randomchallenge":"challenge"}
+ALIASES={"haha":"joke","lol":"joke","lmao":"joke","roastme":"roast","hype":"compliment","magic8":"fortune","vibecheck":"vibe","randomemoji":"emoji","randomcolor":"color","randomsnack":"snack","randomanimal":"animal","randommovie":"movie","randomsong":"songidea","dailychallenge":"challenge","yeet":"dramatic","bruh":"brainrot","skillissue":"roast","wholesome":"compliment","dad_joke":"dadjoke","fakecrash":"fakeerror","error":"fakeerror","coin":"coinflip","flip":"coinflip","8ball":"fortune","jokeplease":"joke","factplease":"fact","quoteplease":"quote","moodcheck":"mood","sleepy":"sleep","coffeeplease":"coffee","clap":"clapback","randomnumber":"roll","riddleme":"riddle","server":"serverinfo","whois":"userinfo","pfp":"avatar","commands":"help","roastbattle":"roast","goodvibes":"compliment","badvibes":"insult","fortune_cookie":"fortune","randomfact":"fact","randomquote":"quote","randomriddle":"riddle","randomjoke":"joke","randomrate":"rate","shipname":"ship","memeplease":"meme","npcmode":"npc","truthplease":"truth","dareplease":"dare","randomchallenge":"challenge"}
 for alias,target in ALIASES.items():
     if bot.get_command(target) is None:
         continue
