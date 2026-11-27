@@ -474,6 +474,8 @@ async def trivia(ctx):
 @bot.hybrid_command()
 async def poll(ctx, *, prompt: str = None):
     if ctx.interaction is not None and prompt is None:
+        if not ctx.guild:
+            return await ctx.interaction.response.send_message("Use this command inside a server.", ephemeral=True)
         if not ctx.author.guild_permissions.manage_guild:
             return await ctx.interaction.response.send_message("Manage Server permission required to create a configured poll.", ephemeral=True)
         return await ctx.interaction.response.send_modal(PollBuilderModal())
