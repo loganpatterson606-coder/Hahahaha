@@ -40,11 +40,11 @@ Use Python 3.10+, install with `pip install -r requirements.txt`, set the enviro
 - XP, coins, warnings, and poll lookup data are in memory and reset when the worker restarts.
 - Use `!help` in Discord to see the available commands.
 
-## Per-server customisation
+## Per-command customisation
 
-Each built-in fun-response command has its own customisation option. For example, run `/roast customize:True`, `/joke customize:True`, or `/meme customize:True` to open that command's own response editor. Normal use (such as `/roast`) still runs the command. Customisation requires **Manage Server**.
+Each built-in fun-response command has its own **Customize this command** button attached to its response. Run a command such as `/roast`, `/joke`, or `/meme`, then press that command's button to open its response editor. There is no central customizer or generic settings command. Customisation requires **Manage Server**.
 
-`/settings` shows which categories have custom responses. Custom responses are stored in a local SQLite database. On Render, attach a persistent disk and set `BOT_DATABASE` to a path on that disk if you want settings to survive redeploys; otherwise the platform may discard the database during a new deploy.
+Custom responses are stored per server in SQLite. On Render, attach a persistent disk and set `BOT_DATABASE` to a path on that disk if you want settings to survive redeploys; otherwise the database may be lost when the service is replaced.
 
 ## Polls, giveaways, and Spotify
 
